@@ -1,6 +1,6 @@
 # MetaForce Privacy Policy
 
-Last updated: [Date]
+Last updated: [03/09/2023]
 
 ## Introduction
 
@@ -42,5 +42,5 @@ In this privacy policy, we seek to explain to you how we collect, use, and safeg
 
 ## Contact Us
 
-If you have any questions or concerns about this privacy policy, you may contact us at [Contact Email].
+If you have any questions or concerns about this privacy policy, you may contact us at [behera.manas98@gmail.com].
 
