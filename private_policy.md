@@ -1,49 +1,58 @@
-# Privacy Policy 
+# Privacy Policy for [MetaForce]
 
-**Last Updated: [03/09/2023]**
+_Last Updated: [08/09/2023]_
 
-## Introduction
+This Privacy Policy describes how we collect, use, and store your information when you install and use [Your Chrome Extension Name].
 
-Thank you for choosing to use our extension. We are committed to protecting your personal information and your right to privacy. If you have any questions or concerns about this Privacy Policy or our practices with regard to your personal information, please contact us at [behera.manas98@gmail.com].
+## Table of Contents
 
-This Privacy Policy applies to all information collected through our Chrome extension (hereinafter referred to as "Extension").
+- [What Information We Collect](#what-information-we-collect)
+- [How We Use Your Information](#how-we-use-your-information)
+- [Data Sharing](#data-sharing)
+- [Security](#security)
+- [Cookies](#cookies)
+- [Children's Privacy](#childrens-privacy)
+- [Changes to This Privacy Policy](#changes-to-this-privacy-policy)
+- [Contact Us](#contact-us)
 
-## Information We Collect
+## What Information We Collect
 
-### Cookie Information
+### Log Data
 
-Our Extension may require access to browser cookies to enable specific features.
+This extension logs data, including URLs of the web pages you visit and how you interact with the extension, strictly for the purpose of its core functionality.
 
-### User Preferences
+### Usage Data
 
-The Extension may collect data related to your user preferences to provide an enhanced experience.
+We collect anonymous data to improve the functionality and user experience of the extension. This includes, but is not limited to, data about how you interact with the extension.
 
 ## How We Use Your Information
 
-- **For the Extension to Function Properly:** Some features require access to specific browser data.
-  
-- **To Improve User Experience:** We may use aggregated, anonymized data to improve the Extension and offer a more tailored user experience.
+We use the information we collect strictly for the core functionality of the extension, and to:
+
+- Understand user behavior to improve the extension
+- Analyze usage metrics to understand user needs
+- Provide feature updates, support, and a more personalized experience
 
 ## Data Sharing
 
-We will not share your personal information with third parties, except when it is essential for the functioning of the Extension or to comply with legal obligations.
+We do not share any personal information we collect with third parties. All data collected remains within the extension and is not sent to external servers.
 
-## Data Retention
+## Security
 
-We retain the collected information only for as long as necessary to provide you with the requested service.
+We take security seriously and take reasonable steps to protect your information.
 
-## Security of Your Information
+## Cookies
 
-We employ industry-standard security measures to protect the integrity and security of your information within the Extension.
+The extension does not use cookies.
 
-## Third-Party Services
+## Children's Privacy
 
-Please be aware that the Extension may contain links to third-party services. We are not responsible for the content or privacy practices of those third-party services.
+The extension is not intended for children under the age of 13.
 
-## Updates to This Policy
+## Changes to This Privacy Policy
 
-We reserve the right to modify this Privacy Policy at any time. Any changes will be updated on this page.
+We may update this Privacy Policy from time to time. You are advised to review this page periodically for any changes.
 
 ## Contact Us
 
-If you have any questions or concerns about this Privacy Policy, feel free to contact us at [behera.manas98@gmail.com].
+If you have any questions or suggestions about our Privacy Policy, please contact us at [behera.manas98@gmail.com].
