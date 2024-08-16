@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "MetaForce",
+  "version": "0.5",
+  "description": "A Chrome extension to fetch and view Salesforce object metadata directly from your browser.",
+  "permissions": ["cookies"],
+  "host_permissions": [
+    "https://*.salesforce.com/*",
+    "https://*.visual.force.com/*",
+    "https://*.lightning.force.com/*",
+    "https://*.cloudforce.com/*",
+    "https://*.visualforce.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.salesforce.com/*",
+        "https://*.visual.force.com/*",
+        "https://*.lightning.force.com/*",
+        "https://*.cloudforce.com/*",
+        "https://*.visualforce.com/*"
+      ],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon.png",
+      "48": "icons/icon.png",
+      "128": "icons/icon.png"
+    }
+  }
+}
