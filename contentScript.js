@@ -26,22 +26,12 @@ function debounce(fn, ms) {
   };
 }
 
-// ── Utility: cross-platform clipboard copy ───────────────────────────────────
-// Primary: navigator.clipboard.writeText() — zero DOM manipulation, no
-// Salesforce MutationObserver / unload-listener side-effects.
-// Fallback: offscreen document via the background service worker.
-async function copyToClipboard(text) {
-  // 1. Modern Clipboard API (works when page is focused — user just clicked)
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-    try {
-      await navigator.clipboard.writeText(text);
-      return;
-    } catch (_ignored) {
-      // Permissions-Policy may block; fall through to offscreen approach.
-    }
-  }
-
-  // 2. Offscreen document fallback
+// ── Utility: clipboard copy via background service worker ─────────────────────
+// Content scripts inherit the page's Permissions-Policy, which on Salesforce
+// blocks navigator.clipboard.writeText(). Instead we always delegate to the
+// background service worker, which can use navigator.clipboard directly
+// (Chrome 121+, with the clipboardWrite permission).
+function copyToClipboard(text) {
   return new Promise((resolve, reject) => {
     try {
       chrome.runtime.sendMessage(

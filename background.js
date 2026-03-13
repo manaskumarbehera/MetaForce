@@ -156,20 +156,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   switch (message.action) {
     case "copyToClipboard":
-      ensureOffscreenDocument()
-        .then(() =>
-          chrome.runtime.sendMessage(
-            { target: "offscreen", action: "copyToClipboard", text: message.text },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                sendResponse({ ok: false, error: chrome.runtime.lastError.message });
-                return;
-              }
-              sendResponse(response ?? { ok: false });
-            }
-          )
-        )
-        .catch((err) => sendResponse({ ok: false, error: err.message }));
+      // Primary: navigator.clipboard.writeText() works in service workers
+      // since Chrome 121+ when the extension holds clipboardWrite permission.
+      navigator.clipboard.writeText(message.text)
+        .then(() => sendResponse({ ok: true }))
+        .catch(() => {
+          // Fallback: offscreen document with execCommand("copy")
+          ensureOffscreenDocument()
+            .then(() =>
+              chrome.runtime.sendMessage(
+                { target: "offscreen", action: "copyToClipboard", text: message.text },
+                (response) => {
+                  if (chrome.runtime.lastError) {
+                    sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+                    return;
+                  }
+                  sendResponse(response ?? { ok: false });
+                }
+              )
+            )
+            .catch((err) => sendResponse({ ok: false, error: err.message }));
+        });
       return true;
     case "CONTENT_SCRIPT_LOADED":
       if (sender.tab && sender.tab.id)
