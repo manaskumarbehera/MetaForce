@@ -8,6 +8,15 @@ const LOADER_ELEMENT_ID = "mf-loader";
 let detachOutsideCloseHandler = null;
 let statusTimerId = null;
 
+// ── Shadow DOM isolation ──────────────────────────────────────────────────────
+// All MetaForce UI lives inside a closed Shadow DOM attached to <html> (not
+// <body>). This prevents our DOM mutations from triggering Salesforce's
+// MutationObservers, which internally register `unload` listeners and cause
+// "Permissions policy violation: unload" warnings.
+const mfShadowHost = document.createElement("mf-ext-root");
+document.documentElement.appendChild(mfShadowHost);
+const mfRoot = mfShadowHost.attachShadow({ mode: "closed" });
+
 // ── Utility: debounce ────────────────────────────────────────────────────────
 function debounce(fn, ms) {
   let timer;
@@ -17,7 +26,45 @@ function debounce(fn, ms) {
   };
 }
 
-// ── Utility: highlight matched substring in a text node ──────────────────────
+// ── Utility: cross-platform clipboard copy ───────────────────────────────────
+// Primary: navigator.clipboard.writeText() — zero DOM manipulation, no
+// Salesforce MutationObserver / unload-listener side-effects.
+// Fallback: offscreen document via the background service worker.
+async function copyToClipboard(text) {
+  // 1. Modern Clipboard API (works when page is focused — user just clicked)
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (_ignored) {
+      // Permissions-Policy may block; fall through to offscreen approach.
+    }
+  }
+
+  // 2. Offscreen document fallback
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage(
+        { action: "copyToClipboard", text },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (!response || !response.ok) {
+            reject(new Error((response && response.error) || "Copy failed"));
+            return;
+          }
+          resolve();
+        }
+      );
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+
 function highlightMatch(text, query) {
   if (!query) return document.createTextNode(text);
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -183,12 +230,6 @@ async function fetchMetadataAsync(extractedData) {
     }
   });
 }
-window.addEventListener("pagehide", function () {
-  observer.disconnect();
-});
-window.onerror = function (message, source, lineno, colno, error) {
-  console.error("Uncaught Error:", error);
-};
 function removeSearchBox() {
   if (detachOutsideCloseHandler) {
     detachOutsideCloseHandler();
@@ -198,18 +239,18 @@ function removeSearchBox() {
   clearStatusNotice();
   hideLoadingIndicator();
 
-  const searchContainer = document.getElementById("mf-panel");
+  const searchContainer = mfRoot.querySelector("#mf-panel");
   if (searchContainer) {
     searchContainer.remove();
   }
-  const mainContainer = document.getElementById("mf-main");
+  const mainContainer = mfRoot.querySelector("#mf-main");
   if (mainContainer) {
     mainContainer.remove();
   }
 }
 
 function ensureSearchStyles() {
-  if (document.getElementById(STYLE_ELEMENT_ID)) {
+  if (mfRoot.querySelector("#" + STYLE_ELEMENT_ID)) {
     return;
   }
 
@@ -433,25 +474,29 @@ function ensureSearchStyles() {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 26px;
-    height: 26px;
-    border: 1px solid transparent;
-    background: transparent;
-    border-radius: 5px;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #d8dde6;
+    background: #f0f2f5;
+    border-radius: 6px;
     cursor: pointer;
-    color: #888;
-    opacity: 0;
-    transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+    color: #444;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
     padding: 0;
   }
-  .mf-result-item:hover .mf-result-copy-btn,
-  .mf-result-item.active .mf-result-copy-btn {
-    opacity: 1;
-  }
   .mf-result-copy-btn:hover {
-    background: #eef4ff;
+    background: #0176d3;
     border-color: #0176d3;
-    color: #0176d3;
+    color: #ffffff;
+    transform: scale(1.08);
+  }
+  .mf-result-copy-btn:active {
+    transform: scale(0.95);
+  }
+  .mf-result-copy-btn.mf-copied {
+    background: #2e844a;
+    border-color: #2e844a;
+    color: #ffffff;
   }
   .mf-empty-state {
     padding: 14px 12px;
@@ -532,22 +577,30 @@ function ensureSearchStyles() {
     background: #fafafa;
   }
   .mf-copy-btn {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     width: 100%;
-    border: 1px solid #d8dde6;
-    background: #f8f9fb;
-    color: #444;
+    border: none;
+    background: #0176d3;
+    color: #ffffff;
     border-radius: 6px;
-    padding: 5px 0;
-    font-size: 11px;
+    padding: 9px 0;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
     text-align: center;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    transition: background 0.15s, transform 0.1s;
   }
   .mf-copy-btn:hover {
-    background: #eef4ff;
-    border-color: #0176d3;
-    color: #0176d3;
+    background: #0160b0;
+  }
+  .mf-copy-btn:active {
+    transform: scale(0.97);
+  }
+  .mf-copy-btn.mf-copied {
+    background: #2e844a;
   }
 
   /* ── Status notice ─────────────────────────────────────────────── */
@@ -656,30 +709,34 @@ function ensureSearchStyles() {
     .mf-type-badge { color: #c9c9c9; border-color: #4d4d4d; }
     .mf-value-text { background: #151515; color: #e8e8e8; }
     .mf-value-text.mf-null-value { background: #111; color: #666; }
-    .mf-copy-btn { background: #2a2a2a; border-color: #4d4d4d; color: #c9c9c9; }
-    .mf-copy-btn:hover { background: #2a3448; border-color: #4b91f1; color: #4b91f1; }
+    .mf-copy-btn { background: #1a4a82; color: #ffffff; border: none; }
+    .mf-copy-btn:hover { background: #4b91f1; }
+    .mf-copy-btn.mf-copied { background: #2e844a; }
+    .mf-result-copy-btn { background: #2a2a2a; border-color: #4d4d4d; color: #c9c9c9; }
+    .mf-result-copy-btn:hover { background: #4b91f1; border-color: #4b91f1; color: #ffffff; }
+    .mf-result-copy-btn.mf-copied { background: #2e844a; border-color: #2e844a; color: #ffffff; }
     #${STATUS_ELEMENT_ID} { background: #1f1f1f; color: #f3f3f3; border-color: #3e3e3e; }
     #${STATUS_ELEMENT_ID}.mf-status-error { background: #3a1c21; border-color: #d45068; color: #ffdbe1; }
     #${STATUS_ELEMENT_ID}.mf-status-info  { background: #1f2f4a; border-color: #4b91f1; color: #d7e8ff; }
   }
   `;
-  document.head.appendChild(style);
+  mfRoot.appendChild(style);
 }
 
 // ── Loading indicator ─────────────────────────────────────────────────────────
 function showLoadingIndicator() {
-  if (document.getElementById(LOADER_ELEMENT_ID)) return;
+  if (mfRoot.querySelector("#" + LOADER_ELEMENT_ID)) return;
   ensureSearchStyles();
   const loader = document.createElement("div");
   loader.id = LOADER_ELEMENT_ID;
   const spinner = document.createElement("div");
   spinner.className = "mf-spinner";
   loader.appendChild(spinner);
-  document.body.appendChild(loader);
+  mfRoot.appendChild(loader);
 }
 
 function hideLoadingIndicator() {
-  const loader = document.getElementById(LOADER_ELEMENT_ID);
+  const loader = mfRoot.querySelector("#" + LOADER_ELEMENT_ID);
   if (loader) loader.remove();
 }
 
@@ -741,7 +798,7 @@ function clearStatusNotice() {
     statusTimerId = null;
   }
 
-  const statusElement = document.getElementById(STATUS_ELEMENT_ID);
+  const statusElement = mfRoot.querySelector("#" + STATUS_ELEMENT_ID);
   if (statusElement) {
     statusElement.remove();
   }
@@ -767,7 +824,7 @@ function showStatusNotice(message, kind = "info") {
 
   statusElement.appendChild(msgSpan);
   statusElement.appendChild(dismissBtn);
-  document.body.appendChild(statusElement);
+  mfRoot.appendChild(statusElement);
 
   statusTimerId = setTimeout(() => {
     clearStatusNotice();
@@ -775,7 +832,7 @@ function showStatusNotice(message, kind = "info") {
 }
 
 function createSearchBox(originalData, objectType = "") {
-  let searchIcon = document.getElementById("mf-trigger");
+  let searchIcon = mfRoot.querySelector("#mf-trigger");
   if (!searchIcon) {
     ensureSearchStyles();
 
@@ -797,7 +854,7 @@ function createSearchBox(originalData, objectType = "") {
     searchIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
 
     mainContainer.appendChild(searchIcon);
-    document.body.appendChild(mainContainer);
+    mfRoot.appendChild(mainContainer);
 
     // Persists the last search text so "Back" can restore the filtered list
     let lastSearchText = "";
@@ -807,7 +864,7 @@ function createSearchBox(originalData, objectType = "") {
       searchIcon.style.display = "none";
 
       // Re-open existing panel if it was hidden
-      const existingContainer = document.getElementById("mf-panel");
+      const existingContainer = mfRoot.querySelector("#mf-panel");
       if (existingContainer) {
         existingContainer.style.display = "block";
         searchIcon.setAttribute("aria-expanded", "true");
@@ -820,7 +877,7 @@ function createSearchBox(originalData, objectType = "") {
         }
         if (!detachOutsideCloseHandler) {
           const handleOutsidePointerDown = function (event) {
-            if (!mainContainer.contains(event.target)) {
+            if (event.target !== mfShadowHost && !mfShadowHost.contains(event.target)) {
               closeSearchUI(existingContainer, searchIcon, existingSearchBox, existingContainer.querySelector("#mf-results"));
             }
           };
@@ -889,7 +946,7 @@ function createSearchBox(originalData, objectType = "") {
 
       // Outside-click handler
       const handleOutsidePointerDown = function (event) {
-        if (!mainContainer.contains(event.target)) {
+        if (event.target !== mfShadowHost && !mfShadowHost.contains(event.target)) {
           closeSearchUI(searchContainer, searchIcon, searchBox, resultList);
         }
       };
@@ -953,20 +1010,28 @@ function createSearchBox(originalData, objectType = "") {
         valueText.className = "mf-value-text" + (isNullish ? " mf-null-value" : "");
         valueText.textContent = formattedValue.display;
 
-        // Copy button — always visible (no hover-only)
+        // Copy button — always visible, prominent
         const copyButton = document.createElement("button");
         copyButton.type = "button";
         copyButton.className = "mf-copy-btn";
-        copyButton.textContent = "Copy";
+        copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy value`;
         copyButton.title = "Copy value to clipboard";
-        copyButton.addEventListener("click", async function () {
+        copyButton.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          e.preventDefault();
           try {
-            await navigator.clipboard.writeText(formattedValue.copyText);
-            copyButton.textContent = "✓ Copied!";
-            setTimeout(() => { copyButton.textContent = "Copy"; }, 2000);
+            await copyToClipboard(formattedValue.copyText);
+            copyButton.classList.add("mf-copied");
+            copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg>Copied!`;
+            setTimeout(() => {
+              copyButton.classList.remove("mf-copied");
+              copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy value`;
+            }, 1500);
           } catch (error) {
-            copyButton.textContent = "Error";
-            setTimeout(() => { copyButton.textContent = "Copy"; }, 1500);
+            copyButton.textContent = "Copy failed — try again";
+            setTimeout(() => {
+              copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy value`;
+            }, 2000);
           }
         });
 
@@ -1055,14 +1120,18 @@ function createSearchBox(originalData, objectType = "") {
           copyBtn.innerHTML = copyIcon;
           copyBtn.addEventListener("click", async function (e) {
             e.stopPropagation();
+            e.preventDefault();
             try {
-              await navigator.clipboard.writeText(formatted.copyText);
+              await copyToClipboard(formatted.copyText);
               copyBtn.innerHTML = checkIcon;
-              copyBtn.style.color = "#0176d3";
-              setTimeout(() => { copyBtn.innerHTML = copyIcon; copyBtn.style.color = ""; }, 2000);
+              copyBtn.classList.add("mf-copied");
+              setTimeout(() => {
+                copyBtn.innerHTML = copyIcon;
+                copyBtn.classList.remove("mf-copied");
+              }, 1500);
             } catch (_) {
               copyBtn.textContent = "!";
-              setTimeout(() => { copyBtn.innerHTML = copyIcon; }, 1500);
+              setTimeout(() => { copyBtn.innerHTML = copyIcon; copyBtn.classList.remove("mf-copied"); }, 1500);
             }
           });
 

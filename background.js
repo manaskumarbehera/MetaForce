@@ -1,5 +1,25 @@
 let contentScriptLoadedTabs = new Set();
 const API_VERSION = "v58.0";
+
+// ── Offscreen document (clipboard) ──────────────────────────────────────────
+let _creatingOffscreen = null;
+
+async function ensureOffscreenDocument() {
+  const existing = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+    documentUrls: [chrome.runtime.getURL("offscreen.html")],
+  });
+  if (existing.length > 0) return;
+  if (_creatingOffscreen) { await _creatingOffscreen; return; }
+  _creatingOffscreen = chrome.offscreen.createDocument({
+    url: "offscreen.html",
+    reasons: [chrome.offscreen.Reason.CLIPBOARD],
+    justification: "Copy Salesforce field value to clipboard",
+  });
+  await _creatingOffscreen;
+  _creatingOffscreen = null;
+}
+
 function sendError(sendResponse, message) {
   sendResponse({ error: message });
 }
@@ -131,7 +151,26 @@ async function handleFetchMetadata(message, sender, sendResponse) {
 
 // Message Listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Ignore messages intended for the offscreen document (they pass through here)
+  if (message.target === "offscreen") return false;
+
   switch (message.action) {
+    case "copyToClipboard":
+      ensureOffscreenDocument()
+        .then(() =>
+          chrome.runtime.sendMessage(
+            { target: "offscreen", action: "copyToClipboard", text: message.text },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+                return;
+              }
+              sendResponse(response ?? { ok: false });
+            }
+          )
+        )
+        .catch((err) => sendResponse({ ok: false, error: err.message }));
+      return true;
     case "CONTENT_SCRIPT_LOADED":
       if (sender.tab && sender.tab.id)
         contentScriptLoadedTabs.add(sender.tab.id);

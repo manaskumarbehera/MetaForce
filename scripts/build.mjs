@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, "..");
 const distDir = path.join(root, "dist");
 
-const requiredFiles = ["manifest.json", "background.js", "contentScript.js"];
+const requiredFiles = ["manifest.json", "background.js", "contentScript.js", "offscreen.html", "offscreen.js"];
 
 for (const file of requiredFiles) {
   try {

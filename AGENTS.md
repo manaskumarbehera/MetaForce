@@ -13,6 +13,7 @@
 - `contentScript.js` watches SPA navigation (`MutationObserver` on `document.body`), extracts `{ objectType, recordId }` from Lightning URLs, then requests metadata via `chrome.runtime.sendMessage`.
 - `background.js` resolves Salesforce `sid` cookie for the active org (tries `salesforce.com`, then `cloudforce.com`), calls REST `describe` + record endpoints, and returns a field map.
 - Content script converts response into table rows (`prepareTableData`) and renders a floating search UI (`createSearchBox`) for field/value lookup.
+- All MetaForce UI elements live inside a **closed Shadow DOM** (`<mf-ext-root>` attached to `<html>`, not `<body>`). This isolates our DOM mutations from Salesforce's MutationObservers, preventing "Permissions policy violation: unload" warnings.
 
 ## Message contracts (keep stable)
 - Actions handled in `background.js` listener:
@@ -43,4 +44,4 @@
 ## Safe change boundaries
 - If editing `manifest.json`, keep host permissions aligned with cookie lookup domains.
 - If editing `background.js`, keep response schema compatible with `prepareTableData`.
-- If editing `contentScript.js`, avoid creating duplicate UI roots (`mainContainer`, `searchContainer`) and ensure observer cleanup on unload.
+- If editing `contentScript.js`, avoid creating duplicate UI roots (`mainContainer`, `searchContainer`), keep all UI inside the shadow root (`mfRoot`), and never append MetaForce elements directly to `document.body`.
