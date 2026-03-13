@@ -26,12 +26,26 @@ function debounce(fn, ms) {
   };
 }
 
-// ── Utility: clipboard copy via background service worker ─────────────────────
-// Content scripts inherit the page's Permissions-Policy, which on Salesforce
-// blocks navigator.clipboard.writeText(). Instead we always delegate to the
-// background service worker, which can use navigator.clipboard directly
-// (Chrome 121+, with the clipboardWrite permission).
+// ── Utility: clipboard copy ───────────────────────────────────────────────────
+// 1. Primary: document.execCommand("copy") with a hidden textarea inside our
+//    closed shadow root.  Not blocked by Permissions-Policy (that only gates
+//    navigator.clipboard), and invisible to Salesforce's MutationObservers.
+// 2. Fallback: delegate to the background service worker → offscreen document.
 function copyToClipboard(text) {
+  // ── Try execCommand inside the shadow root first ──
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none";
+    mfRoot.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    if (ok) return Promise.resolve();
+  } catch (_ignored) { /* fall through to background */ }
+
+  // ── Fallback: background → offscreen document ──
   return new Promise((resolve, reject) => {
     try {
       chrome.runtime.sendMessage(

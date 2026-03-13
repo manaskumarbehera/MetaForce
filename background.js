@@ -156,27 +156,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   switch (message.action) {
     case "copyToClipboard":
-      // Primary: navigator.clipboard.writeText() works in service workers
-      // since Chrome 121+ when the extension holds clipboardWrite permission.
-      navigator.clipboard.writeText(message.text)
-        .then(() => sendResponse({ ok: true }))
-        .catch(() => {
-          // Fallback: offscreen document with execCommand("copy")
-          ensureOffscreenDocument()
-            .then(() =>
-              chrome.runtime.sendMessage(
-                { target: "offscreen", action: "copyToClipboard", text: message.text },
-                (response) => {
-                  if (chrome.runtime.lastError) {
-                    sendResponse({ ok: false, error: chrome.runtime.lastError.message });
-                    return;
-                  }
-                  sendResponse(response ?? { ok: false });
-                }
-              )
-            )
-            .catch((err) => sendResponse({ ok: false, error: err.message }));
-        });
+      (async () => {
+        // 1. Try navigator.clipboard (service workers, Chrome 121+)
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(message.text);
+            sendResponse({ ok: true });
+            return;
+          }
+        } catch (_) { /* fall through */ }
+
+        // 2. Fallback: offscreen document with execCommand("copy")
+        try {
+          await ensureOffscreenDocument();
+          chrome.runtime.sendMessage(
+            { target: "offscreen", action: "copyToClipboard", text: message.text },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+                return;
+              }
+              sendResponse(response ?? { ok: false });
+            }
+          );
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
       return true;
     case "CONTENT_SCRIPT_LOADED":
       if (sender.tab && sender.tab.id)
