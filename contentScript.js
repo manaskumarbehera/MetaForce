@@ -183,7 +183,7 @@ async function fetchMetadataAsync(extractedData) {
     }
   });
 }
-window.addEventListener("unload", function () {
+window.addEventListener("pagehide", function () {
   observer.disconnect();
 });
 window.onerror = function (message, source, lineno, colno, error) {
@@ -198,11 +198,11 @@ function removeSearchBox() {
   clearStatusNotice();
   hideLoadingIndicator();
 
-  const searchContainer = document.getElementById("searchContainer");
+  const searchContainer = document.getElementById("mf-panel");
   if (searchContainer) {
     searchContainer.remove();
   }
-  const mainContainer = document.getElementById("mainContainer");
+  const mainContainer = document.getElementById("mf-main");
   if (mainContainer) {
     mainContainer.remove();
   }
@@ -219,10 +219,8 @@ function ensureSearchStyles() {
   /* ── Loading indicator ─────────────────────────────────────────── */
   #${LOADER_ELEMENT_ID} {
     position: fixed;
-    top: 60px;
-    right: 8px;
-    z-index: 1000;
-    width: 40px;
+    bottom: 24px;
+    right: 80px;
     height: 40px;
     display: flex;
     align-items: center;
@@ -242,14 +240,20 @@ function ensureSearchStyles() {
   }
 
   /* ── Main container & trigger icon ────────────────────────────── */
-  #mainContainer {
+  #mf-main {
     position: fixed;
-    top: 60px;
-    right: 8px;
-    z-index: 1000;
+    bottom: 24px;
+    right: 80px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
-  #searchIcon {
+  #mf-trigger {
+    order: 2;
+    flex-shrink: 0;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -264,23 +268,23 @@ function ensureSearchStyles() {
     transition: transform 0.15s, box-shadow 0.2s;
     animation: mf-pulse 2.8s ease-in-out infinite;
   }
-  #searchIcon:hover {
+  #mf-trigger:hover {
     transform: scale(1.1);
     box-shadow: 0 4px 18px rgba(1,118,211,0.6);
     animation: none;
   }
 
   /* ── Panel ─────────────────────────────────────────────────────── */
-  #searchContainer {
+  #mf-panel {
+    order: 1;
     width: 360px;
-    max-width: 80vw;
-    margin-top: 8px;
+    max-width: calc(100vw - 64px);
     background: #ffffff;
     border: 1px solid #d8dde6;
     border-radius: 10px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.15);
     overflow: hidden;
-    animation: mf-slide-in 0.18s ease;
+    animation: mf-slide-in-right 0.18s ease;
   }
 
   /* ── Panel header ──────────────────────────────────────────────── */
@@ -362,27 +366,36 @@ function ensureSearchStyles() {
   }
 
   /* ── Result list ───────────────────────────────────────────────── */
-  #resultList {
+  #mf-results {
     margin: 0;
     padding: 4px 0;
     list-style: none;
-    max-height: 260px;
+    max-height: 340px;
     overflow-y: auto;
   }
   .mf-result-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 7px 12px;
     cursor: pointer;
-    font-size: 13px;
-    color: #181818;
     transition: background 0.1s;
   }
   .mf-result-item:hover,
   .mf-result-item.active {
     background: #eef4ff;
+  }
+  .mf-result-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .mf-result-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .mf-result-field-name {
     flex: 1;
@@ -390,6 +403,15 @@ function ensureSearchStyles() {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 13px;
+    color: #181818;
+  }
+  .mf-result-value-preview {
+    font-size: 11px;
+    color: #777;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mf-highlight {
     background: none;
@@ -405,6 +427,31 @@ function ensureSearchStyles() {
     padding: 1px 7px;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+  .mf-result-copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    color: #888;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+    padding: 0;
+  }
+  .mf-result-item:hover .mf-result-copy-btn,
+  .mf-result-item.active .mf-result-copy-btn {
+    opacity: 1;
+  }
+  .mf-result-copy-btn:hover {
+    background: #eef4ff;
+    border-color: #0176d3;
+    color: #0176d3;
   }
   .mf-empty-state {
     padding: 14px 12px;
@@ -506,9 +553,9 @@ function ensureSearchStyles() {
   /* ── Status notice ─────────────────────────────────────────────── */
   #${STATUS_ELEMENT_ID} {
     position: fixed;
-    top: 112px;
-    right: 8px;
-    z-index: 1001;
+    bottom: 80px;
+    right: 80px;
+    z-index: 100000;
     max-width: 360px;
     border-radius: 8px;
     padding: 10px 12px;
@@ -555,8 +602,8 @@ function ensureSearchStyles() {
     0%, 100% { box-shadow: 0 2px 10px rgba(1,118,211,0.45); }
     50%       { box-shadow: 0 2px 22px rgba(1,118,211,0.75); }
   }
-  @keyframes mf-slide-in {
-    from { opacity: 0; transform: translateY(-8px); }
+  @keyframes mf-slide-in-right {
+    from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
@@ -570,14 +617,14 @@ function ensureSearchStyles() {
       border-color: #3e3e3e;
       border-top-color: #4b91f1;
     }
-    #searchIcon {
+    #mf-trigger {
       background: #1a4a82;
       box-shadow: 0 2px 10px rgba(75,145,241,0.35);
     }
-    #searchIcon:hover {
+    #mf-trigger:hover {
       box-shadow: 0 4px 18px rgba(75,145,241,0.55);
     }
-    #searchContainer {
+    #mf-panel {
       background: #1f1f1f;
       border-color: #3e3e3e;
       box-shadow: 0 8px 24px rgba(0,0,0,0.45);
@@ -595,7 +642,11 @@ function ensureSearchStyles() {
     }
     .mf-result-item { color: #f3f3f3; }
     .mf-result-item:hover, .mf-result-item.active { background: #2a3448; }
+    .mf-result-field-name { color: #f3f3f3; }
+    .mf-result-value-preview { color: #999; }
     .mf-result-type-badge { color: #c9c9c9; background: #2a2a2a; border-color: #4d4d4d; }
+    .mf-result-copy-btn { color: #888; }
+    .mf-result-copy-btn:hover { background: #2a3448; border-color: #4b91f1; color: #4b91f1; }
     .mf-highlight { color: #4b91f1; }
     .mf-empty-state { color: #888; }
     .mf-selected-value { border-color: #333; }
@@ -724,23 +775,23 @@ function showStatusNotice(message, kind = "info") {
 }
 
 function createSearchBox(originalData, objectType = "") {
-  let searchIcon = document.getElementById("searchIcon");
+  let searchIcon = document.getElementById("mf-trigger");
   if (!searchIcon) {
     ensureSearchStyles();
 
     // ── Root container ──────────────────────────────────────────────
     const mainContainer = document.createElement("div");
-    mainContainer.id = "mainContainer";
+    mainContainer.id = "mf-main";
 
     // ── Trigger icon (SVG magnifier) ────────────────────────────────
     const searchIcon = document.createElement("button");
     searchIcon.type = "button";
-    searchIcon.id = "searchIcon";
+    searchIcon.id = "mf-trigger";
     searchIcon.title = "MetaForce — click to search fields";
     searchIcon.setAttribute("role", "button");
     searchIcon.setAttribute("aria-haspopup", "listbox");
     searchIcon.setAttribute("aria-label", "Open MetaForce field search");
-    searchIcon.setAttribute("aria-controls", "resultList");
+    searchIcon.setAttribute("aria-controls", "mf-results");
     searchIcon.setAttribute("aria-expanded", "false");
     searchIcon.tabIndex = 0;
     searchIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
@@ -756,7 +807,7 @@ function createSearchBox(originalData, objectType = "") {
       searchIcon.style.display = "none";
 
       // Re-open existing panel if it was hidden
-      const existingContainer = document.getElementById("searchContainer");
+      const existingContainer = document.getElementById("mf-panel");
       if (existingContainer) {
         existingContainer.style.display = "block";
         searchIcon.setAttribute("aria-expanded", "true");
@@ -764,11 +815,13 @@ function createSearchBox(originalData, objectType = "") {
         if (existingSearchBox) {
           existingSearchBox.setAttribute("aria-expanded", "true");
           existingSearchBox.focus();
+          // Re-render all fields (search box was cleared on close, so this shows everything)
+          existingSearchBox.dispatchEvent(new Event("input"));
         }
         if (!detachOutsideCloseHandler) {
           const handleOutsidePointerDown = function (event) {
             if (!mainContainer.contains(event.target)) {
-              closeSearchUI(existingContainer, searchIcon, existingSearchBox, existingContainer.querySelector("#resultList"));
+              closeSearchUI(existingContainer, searchIcon, existingSearchBox, existingContainer.querySelector("#mf-results"));
             }
           };
           document.addEventListener("pointerdown", handleOutsidePointerDown);
@@ -781,7 +834,7 @@ function createSearchBox(originalData, objectType = "") {
 
       // ── Build the panel ───────────────────────────────────────────
       const searchContainer = document.createElement("div");
-      searchContainer.id = "searchContainer";
+      searchContainer.id = "mf-panel";
 
       // Header bar
       const panelHeader = document.createElement("div");
@@ -820,7 +873,7 @@ function createSearchBox(originalData, objectType = "") {
       searchBox.setAttribute("role", "combobox");
       searchBox.setAttribute("aria-autocomplete", "list");
       searchBox.setAttribute("aria-label", "Search Salesforce fields");
-      searchBox.setAttribute("aria-controls", "resultList");
+      searchBox.setAttribute("aria-controls", "mf-results");
       searchBox.setAttribute("aria-expanded", "true");
       searchBox.placeholder = "Search any field…";
       searchIcon.setAttribute("aria-expanded", "true");
@@ -831,7 +884,7 @@ function createSearchBox(originalData, objectType = "") {
 
       // Result list
       const resultList = document.createElement("ul");
-      resultList.id = "resultList";
+      resultList.id = "mf-results";
       resultList.setAttribute("role", "listbox");
 
       // Outside-click handler
@@ -962,18 +1015,58 @@ function createSearchBox(originalData, objectType = "") {
           listItem.setAttribute("role", "option");
           listItem.setAttribute("aria-selected", String(index === activeIndex));
 
-          // Field name with highlighted match
+          // ── Main block (field name row + value preview row) ───────
+          const resultMain = document.createElement("div");
+          resultMain.className = "mf-result-main";
+
+          // Top row: field name + type badge
+          const resultTop = document.createElement("div");
+          resultTop.className = "mf-result-top";
+
           const fieldNameSpan = document.createElement("span");
           fieldNameSpan.className = "mf-result-field-name";
           fieldNameSpan.appendChild(highlightMatch(row.Field, query));
           fieldNameSpan.title = row.Field;
 
-          // Inline type badge
           const typeBadge = document.createElement("span");
           typeBadge.className = "mf-result-type-badge";
           typeBadge.textContent = row.Type || "—";
 
-          listItem.append(fieldNameSpan, typeBadge);
+          resultTop.append(fieldNameSpan, typeBadge);
+
+          // Value preview row
+          const formatted = formatFieldValue(row.Value, row.Type ? String(row.Type) : "unknown");
+          const previewRaw = formatted.display;
+          const valuePreview = document.createElement("span");
+          valuePreview.className = "mf-result-value-preview";
+          valuePreview.textContent = previewRaw.length > 70 ? previewRaw.slice(0, 70) + "…" : previewRaw;
+          valuePreview.title = previewRaw;
+
+          resultMain.append(resultTop, valuePreview);
+
+          // ── Inline copy button ────────────────────────────────────
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "mf-result-copy-btn";
+          copyBtn.title = `Copy value of ${row.Field}`;
+          copyBtn.setAttribute("aria-label", `Copy value of ${row.Field}`);
+          const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+          const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+          copyBtn.innerHTML = copyIcon;
+          copyBtn.addEventListener("click", async function (e) {
+            e.stopPropagation();
+            try {
+              await navigator.clipboard.writeText(formatted.copyText);
+              copyBtn.innerHTML = checkIcon;
+              copyBtn.style.color = "#0176d3";
+              setTimeout(() => { copyBtn.innerHTML = copyIcon; copyBtn.style.color = ""; }, 2000);
+            } catch (_) {
+              copyBtn.textContent = "!";
+              setTimeout(() => { copyBtn.innerHTML = copyIcon; }, 1500);
+            }
+          });
+
+          listItem.append(resultMain, copyBtn);
 
           listItem.addEventListener("mouseenter", function () {
             activeIndex = index;
