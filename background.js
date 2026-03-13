@@ -142,7 +142,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleFetchMetadata(message, sender, sendResponse);
       return true;
     default:
-      console.warn("[Background] Unexpected message action:", message.action);
       sendResponse({ status: "unexpected_message" });
       break;
   }
