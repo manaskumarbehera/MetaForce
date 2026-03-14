@@ -2,7 +2,7 @@
   "name": "metaforce-extension",
   "version": "0.8.0",
   "private": true,
-  "description": "MetaForce Chrome extension development scripts",
+  "description": "MetaForce browser extension development scripts",
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "lint": "node --check background.js && node --check contentScript.js && node --check offscreen.js && node --check scripts/build.mjs && node --check scripts/clean.mjs && node --check scripts/package.mjs && node --check test/UrlParserTest.js && node --check test/ClipboardCopyTest.js",
