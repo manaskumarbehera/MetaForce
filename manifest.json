@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "MetaForce",
-  "version": "0.7",
-  "description": "A Chrome extension to fetch and view Salesforce object metadata directly from your browser.",
+  "version": "0.8",
+  "description": "A browser extension (Chrome & Edge) to fetch and view Salesforce object metadata directly from your browser.",
   "permissions": ["cookies", "clipboardWrite", "offscreen"],
   "host_permissions": [
     "https://*.salesforce.com/*",

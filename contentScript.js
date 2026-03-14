@@ -27,17 +27,29 @@ function debounce(fn, ms) {
 }
 
 // ── Utility: clipboard copy ───────────────────────────────────────────────────
-// 1. Primary: document.execCommand("copy") with a hidden textarea inside our
-//    closed shadow root.  Not blocked by Permissions-Policy (that only gates
-//    navigator.clipboard), and invisible to Salesforce's MutationObservers.
-// 2. Fallback: delegate to the background service worker → offscreen document.
+// Three-tier fallback for maximum Chrome + Edge compatibility:
+// 1. navigator.clipboard.writeText() — works when the page's Permissions-Policy
+//    allows it and a user gesture is active.
+// 2. document.execCommand("copy") with a hidden textarea on
+//    document.documentElement (NOT the closed shadow root — execCommand cannot
+//    see selections inside a closed shadow DOM; NOT document.body — avoids
+//    triggering Salesforce's body MutationObservers).
+// 3. Delegate to the background service worker → offscreen document.
 function copyToClipboard(text) {
-  // ── Try execCommand inside the shadow root first ──
+  // ── Tier 1: navigator.clipboard (user-gesture required) ──
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    return navigator.clipboard.writeText(text).catch(() => _execCopyFallback(text));
+  }
+  return _execCopyFallback(text);
+}
+
+function _execCopyFallback(text) {
+  // ── Tier 2: execCommand on a textarea attached to <html> ──
   try {
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none";
-    mfRoot.appendChild(ta);
+    document.documentElement.appendChild(ta);
     ta.focus();
     ta.select();
     const ok = document.execCommand("copy");
@@ -45,7 +57,7 @@ function copyToClipboard(text) {
     if (ok) return Promise.resolve();
   } catch (_ignored) { /* fall through to background */ }
 
-  // ── Fallback: background → offscreen document ──
+  // ── Tier 3: background → offscreen document ──
   return new Promise((resolve, reject) => {
     try {
       chrome.runtime.sendMessage(

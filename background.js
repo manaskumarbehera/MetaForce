@@ -5,19 +5,36 @@ const API_VERSION = "v58.0";
 let _creatingOffscreen = null;
 
 async function ensureOffscreenDocument() {
-  const existing = await chrome.runtime.getContexts({
-    contextTypes: ["OFFSCREEN_DOCUMENT"],
-    documentUrls: [chrome.runtime.getURL("offscreen.html")],
-  });
-  if (existing.length > 0) return;
+  // chrome.runtime.getContexts is available Chrome 116+ / Edge 116+.
+  // Guard for older Edge versions that lack it.
+  if (typeof chrome.runtime.getContexts === "function") {
+    const existing = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [chrome.runtime.getURL("offscreen.html")],
+    });
+    if (existing.length > 0) return;
+  }
+
   if (_creatingOffscreen) { await _creatingOffscreen; return; }
-  _creatingOffscreen = chrome.offscreen.createDocument({
-    url: "offscreen.html",
-    reasons: [chrome.offscreen.Reason.CLIPBOARD],
-    justification: "Copy Salesforce field value to clipboard",
-  });
-  await _creatingOffscreen;
-  _creatingOffscreen = null;
+
+  if (!chrome.offscreen) {
+    throw new Error("Offscreen API not available in this browser");
+  }
+
+  try {
+    _creatingOffscreen = chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: [chrome.offscreen.Reason.CLIPBOARD],
+      justification: "Copy Salesforce field value to clipboard",
+    });
+    await _creatingOffscreen;
+  } catch (err) {
+    // If getContexts was unavailable we may try to create a document that
+    // already exists — tolerate that specific error.
+    if (!err.message?.includes("Only a single offscreen")) throw err;
+  } finally {
+    _creatingOffscreen = null;
+  }
 }
 
 function sendError(sendResponse, message) {
