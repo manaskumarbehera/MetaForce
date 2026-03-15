@@ -8,16 +8,20 @@
 ## Architecture and data flow
 - Entry wiring lives in `manifest.json`:
   - `background.service_worker` -> `background.js`
-  - `content_scripts[*].js` -> `contentScript.js`
+  - `content_scripts[*].js` -> `contentScript.js` (`run_at: "document_idle"`)
   - permissions: `cookies`, `clipboardWrite`, `offscreen` + Salesforce host patterns
-- `contentScript.js` watches SPA navigation (`MutationObserver` on `document.body`), extracts `{ objectType, recordId }` from Lightning URLs, then requests metadata via `chrome.runtime.sendMessage`.
+- `contentScript.js` watches SPA navigation (`MutationObserver` on `document.body`), extracts `{ objectType, recordId }` from Lightning URLs, then requests metadata via `chrome.runtime.sendMessage`. An **initial bootstrap block** runs once after the observer is attached to handle the case where the page is already stable at `document_idle` (no DOM mutation would otherwise fire).
 - `background.js` resolves Salesforce `sid` cookie for the active org (tries `salesforce.com`, then `cloudforce.com`), calls REST `describe` + record endpoints, and returns a field map.
-- Content script converts response into table rows (`prepareTableData`) and renders a floating search UI (`createSearchBox`) for field/value lookup.
+- Content script converts response into table rows (`prepareTableData`) and renders a floating search UI (`createSearchBox`) for field/value lookup. The `filterRows` helper matches against **both field API name and stringified value** (case-insensitive).
+- `mainLogic` brackets the async fetch with `showLoadingIndicator()` / `hideLoadingIndicator()` and shows `showStatusNotice(msg, kind)` on error or empty results (auto-dismisses after 8 s).
 - All MetaForce UI elements live inside a **closed Shadow DOM** (`<mf-ext-root>` attached to `<html>`, not `<body>`). This isolates our DOM mutations from Salesforce's MutationObservers, preventing "Permissions policy violation: unload" warnings.
-- **Clipboard copy flow** (three-tier fallback):
+- UI includes **dark mode** support via `@media (prefers-color-scheme: dark)` in the injected `<style>`. When adding or modifying CSS, always include matching dark-mode overrides.
+- UI elements carry **ARIA attributes** (`role="combobox"`, `role="listbox"`, `role="option"`, `aria-expanded`, `aria-activedescendant`) and support **keyboard navigation** (ArrowUp/Down to cycle results, Enter to select, Escape to close). Preserve these when modifying UI code.
+- **Clipboard copy flow** (two-tier fallback):
   1. Content script `copyToClipboard()` first tries `navigator.clipboard.writeText()` (works when user gesture is active and page Permissions-Policy allows it).
-  2. Falls back to `document.execCommand("copy")` with a hidden textarea on `document.documentElement` (**not** the closed shadow root — `execCommand` cannot see selections inside closed shadow DOM; **not** `document.body` — avoids triggering Salesforce's body MutationObservers).
-  3. Delegates to the background service worker via `{ action: "copyToClipboard", text }`. Background tries `navigator.clipboard.writeText()` (Chrome 121+); if unavailable, spins up an offscreen document (`offscreen.html` → `offscreen.js`) and delegates via `document.execCommand("copy")` there.
+  2. Delegates to the background service worker via `{ action: "copyToClipboard", text }`. Background always spins up an offscreen document (`offscreen.html` → `offscreen.js`) and delegates via `document.execCommand("copy")` there.
+  - **Why not `execCommand` in the content script?** A failed `navigator.clipboard.writeText()` consumes the transient user activation, so a subsequent `execCommand("copy")` would return `false`. It also calls `textarea.focus()`, stealing focus from the shadow-DOM search input.
+  - **Why not `navigator.clipboard` in the background service worker?** It can resolve without actually writing to the clipboard because service workers are never focused.
 
 ## Message contracts (keep stable)
 - Actions handled in `background.js` listener:
@@ -39,8 +43,10 @@
 - API version is hardcoded in `background.js` as `API_VERSION = "v58.0"`; update intentionally if Salesforce API changes.
 - URL parsing is Lightning-specific: `/lightning/r/<Object>/<15-18 char id>/view` (`extractObjectTypeFromURL`).
 - UI state is global in content script (`globalTableData`, `lastUrl`, `lastRecordId`); URL changes must call `removeSearchBox()` and reset globals.
+- `detachOutsideCloseHandler` holds a cleanup function for the outside-click listener; `statusTimerId` holds the auto-dismiss timer for status notices. Both are cleared inside `removeSearchBox()` — always call it on route changes.
+- CSS ID constants (`STYLE_ELEMENT_ID`, `STATUS_ELEMENT_ID`, `LOADER_ELEMENT_ID`) guard against duplicate style/status/loader elements in the shadow root; never bypass these checks.
 - Background async messaging relies on `return true` in the listener for metadata actions; do not remove.
-- Cookie lookup depends on `sender.tab.cookieStoreId`; preserve this when refactoring cookie access.
+- Cookie lookup depends on `sender.tab.cookieStoreId`; it is threaded through `handleFetchMetadata` → `fetchObjectMetadata` → `getAuthToken`. Preserve this when refactoring cookie access.
 - `requestToken` in content script guards against stale responses after rapid SPA navigation; always increment before async calls and check before rendering.
 - `_creatingOffscreen` in `background.js` is a singleton guard to prevent duplicate offscreen document creation; do not remove.
 - `navigator.clipboard.writeText()` does **not** work in offscreen documents (never focused); `document.execCommand("copy")` is the only mechanism there.
@@ -49,7 +55,7 @@
 
 ## Working and debugging workflow
 - Load as an unpacked extension from project root for direct source iteration, or from `dist/` after `npm run build`.
-- Run `npm run test` after changes; it executes both `test/UrlParserTest.js` and `test/ClipboardCopyTest.js`.
+- Run `npm run test` after changes; it executes `test/UrlParserTest.js`, `test/ClipboardCopyTest.js`, `test/BackgroundFetchTest.js`, `test/ValueSearchTest.js`, and `test/InitialBootstrapTest.js`.
 - Run `npm run lint` to syntax-check all JS sources via `node --check`.
 - Validate on Salesforce Lightning record pages; verify search icon appears and field lookup works.
 - Useful debug points:

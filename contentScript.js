@@ -27,37 +27,26 @@ function debounce(fn, ms) {
 }
 
 // ── Utility: clipboard copy ───────────────────────────────────────────────────
-// Three-tier fallback for maximum Chrome + Edge compatibility:
+// Two-tier fallback for Chrome + Edge compatibility:
 // 1. navigator.clipboard.writeText() — works when the page's Permissions-Policy
 //    allows it and a user gesture is active.
-// 2. document.execCommand("copy") with a hidden textarea on
-//    document.documentElement (NOT the closed shadow root — execCommand cannot
-//    see selections inside a closed shadow DOM; NOT document.body — avoids
-//    triggering Salesforce's body MutationObservers).
-// 3. Delegate to the background service worker → offscreen document.
+// 2. Delegate to the background service worker → offscreen document (always
+//    reliable; offscreen documents with CLIPBOARD reason support execCommand).
+//
+// NOTE: We intentionally skip document.execCommand("copy") in the content
+// script.  When Tier 1 fails, the browser consumes the transient user
+// activation, so execCommand would return false anyway.  It also calls
+// textarea.focus() which steals focus from the shadow-DOM search input.
 function copyToClipboard(text) {
   // ── Tier 1: navigator.clipboard (user-gesture required) ──
   if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-    return navigator.clipboard.writeText(text).catch(() => _execCopyFallback(text));
+    return navigator.clipboard.writeText(text).catch(() => _bgCopyFallback(text));
   }
-  return _execCopyFallback(text);
+  return _bgCopyFallback(text);
 }
 
-function _execCopyFallback(text) {
-  // ── Tier 2: execCommand on a textarea attached to <html> ──
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none";
-    document.documentElement.appendChild(ta);
-    ta.focus();
-    ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove();
-    if (ok) return Promise.resolve();
-  } catch (_ignored) { /* fall through to background */ }
-
-  // ── Tier 3: background → offscreen document ──
+function _bgCopyFallback(text) {
+  // ── Tier 2: background → offscreen document ──
   return new Promise((resolve, reject) => {
     try {
       chrome.runtime.sendMessage(
@@ -125,6 +114,21 @@ const observer = new MutationObserver(() => {
 const config = { childList: true, subtree: true };
 // Start observing the entire body for changes
 observer.observe(document.body, config);
+
+// ── Initial bootstrap ─────────────────────────────────────────────────────────
+// The MutationObserver only fires on *future* mutations. If the record page is
+// already stable at document_idle (no further DOM changes), the search icon
+// would never appear. Perform one immediate URL check to cover this case.
+{
+  const initialUrl = window.location.href;
+  const extractedData = extractObjectTypeFromURL(initialUrl);
+  if (extractedData !== null) {
+    lastUrl = initialUrl;
+    lastRecordId = extractedData.recordId;
+    mainLogic(extractedData);
+  }
+}
+
 // Main logic
 async function mainLogic(extractedData) {
   try {
@@ -499,6 +503,10 @@ function ensureSearchStyles() {
     color: #444;
     transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
     padding: 0;
+  }
+  .mf-result-copy-btn svg,
+  .mf-copy-btn svg {
+    pointer-events: none;
   }
   .mf-result-copy-btn:hover {
     background: #0176d3;
@@ -942,13 +950,13 @@ function createSearchBox(originalData, objectType = "") {
       const searchBox = document.createElement("input");
       searchBox.type = "text";
       searchBox.className = "mf-search-input";
-      searchBox.title = "Search fields by API name…";
+      searchBox.title = "Search fields by name or value…";
       searchBox.setAttribute("role", "combobox");
       searchBox.setAttribute("aria-autocomplete", "list");
-      searchBox.setAttribute("aria-label", "Search Salesforce fields");
+      searchBox.setAttribute("aria-label", "Search Salesforce fields by name or value");
       searchBox.setAttribute("aria-controls", "mf-results");
       searchBox.setAttribute("aria-expanded", "true");
-      searchBox.placeholder = "Search any field…";
+      searchBox.placeholder = "Search by field name or value…";
       searchIcon.setAttribute("aria-expanded", "true");
 
       const searchRow = document.createElement("div");
@@ -974,6 +982,17 @@ function createSearchBox(originalData, objectType = "") {
       searchContainer.append(panelHeader, searchRow, resultList);
       mainContainer.appendChild(searchContainer);
 
+      // ── Shared filter: matches field name OR stringified value ─────
+      function filterRows(rows, query) {
+        if (!query) return rows;
+        const q = query.toLowerCase();
+        return rows.filter((row) => {
+          if (row.Field.toLowerCase().includes(q)) return true;
+          const val = row.Value === null || row.Value === undefined ? "" : String(row.Value);
+          return val.toLowerCase().includes(q);
+        });
+      }
+
       // ── displaySelectedValue ──────────────────────────────────────
       function displaySelectedValue(field, data, parentContainer) {
         const matchedRow = data.find((row) => row.Field === field);
@@ -995,9 +1014,7 @@ function createSearchBox(originalData, objectType = "") {
         backBtn.setAttribute("aria-label", "Back to search results");
         backBtn.addEventListener("click", function () {
           valueElement.remove();
-          currentRows = originalData.filter((row) =>
-            row.Field.toLowerCase().includes(lastSearchText.toLowerCase())
-          );
+          currentRows = filterRows(originalData, lastSearchText);
           activeIndex = -1;
           renderResults(currentRows);
           searchBox.focus();
@@ -1069,6 +1086,11 @@ function createSearchBox(originalData, objectType = "") {
         resultList.innerHTML = "";
         currentRows = [];
         activeIndex = -1;
+      }
+
+      function scrollActiveIntoView() {
+        const activeEl = resultList.querySelector(`#mf-option-${activeIndex}`);
+        if (activeEl) activeEl.scrollIntoView({ block: "nearest" });
       }
 
       function renderResults(rows) {
@@ -1154,8 +1176,10 @@ function createSearchBox(originalData, objectType = "") {
           listItem.append(resultMain, copyBtn);
 
           listItem.addEventListener("mouseenter", function () {
-            activeIndex = index;
-            renderResults(currentRows);
+            if (activeIndex !== index) {
+              activeIndex = index;
+              renderResults(currentRows);
+            }
           });
           listItem.addEventListener("click", function () {
             selectRow(row);
@@ -1168,9 +1192,7 @@ function createSearchBox(originalData, objectType = "") {
       // ── Debounced search input ────────────────────────────────────
       const debouncedFilter = debounce(function () {
         lastSearchText = searchBox.value;
-        currentRows = originalData.filter((row) =>
-          row.Field.toLowerCase().includes(lastSearchText.toLowerCase())
-        );
+        currentRows = filterRows(originalData, lastSearchText);
         activeIndex = currentRows.length > 0 ? 0 : -1;
         renderResults(currentRows);
       }, 150);
@@ -1199,6 +1221,7 @@ function createSearchBox(originalData, objectType = "") {
           event.preventDefault();
           activeIndex = (activeIndex + 1) % currentRows.length;
           renderResults(currentRows);
+          scrollActiveIntoView();
           return;
         }
         if (event.key === "ArrowUp") {
@@ -1206,6 +1229,7 @@ function createSearchBox(originalData, objectType = "") {
           event.preventDefault();
           activeIndex = (activeIndex - 1 + currentRows.length) % currentRows.length;
           renderResults(currentRows);
+          scrollActiveIntoView();
           return;
         }
         if (event.key === "Enter") {

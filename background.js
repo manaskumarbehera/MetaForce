@@ -43,9 +43,11 @@ function sendError(sendResponse, message) {
 function sendSuccess(sendResponse, data) {
   sendResponse({ data: data });
 }
-async function getAuthToken(domain) {
+async function getAuthToken(domain, storeId) {
   return new Promise((resolve, reject) => {
-    chrome.cookies.get({ url: `https://${domain}`, name: "sid" }, (cookie) => {
+    const details = { url: `https://${domain}`, name: "sid" };
+    if (storeId) details.storeId = storeId;
+    chrome.cookies.get(details, (cookie) => {
       if (cookie && cookie.value) {
         resolve(cookie.value);
       } else {
@@ -66,15 +68,27 @@ async function fetchData(url, sidAuthToken) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(JSON.stringify(error));
+    // Salesforce normally returns JSON errors, but intermediary proxies or
+    // auth failures may return HTML/plain text. Parse safely.
+    let errorBody;
+    const contentType = response.headers.get("content-type") || "";
+    try {
+      if (contentType.includes("application/json")) {
+        errorBody = JSON.stringify(await response.json());
+      } else {
+        errorBody = await response.text();
+      }
+    } catch (_) {
+      errorBody = `HTTP ${response.status} ${response.statusText}`;
+    }
+    throw new Error(errorBody);
   }
 
   return response.json();
 }
 
-async function fetchObjectMetadata(objectType, recordId, domain) {
-  const sidAuthToken = await getAuthToken(domain);
+async function fetchObjectMetadata(objectType, recordId, domain, storeId) {
+  const sidAuthToken = await getAuthToken(domain, storeId);
   const endpointMetaUrl = `https://${domain}/services/data/${API_VERSION}/sobjects/${objectType}/describe/`;
   const endpointRecordUrl = `https://${domain}/services/data/${API_VERSION}/sobjects/${objectType}/${recordId}/`;
 
@@ -98,12 +112,14 @@ async function fetchObjectMetadata(objectType, recordId, domain) {
 
 async function handleFetchMetadata(message, sender, sendResponse) {
   let hasSentData = false;
+  const storeId = sender.tab?.cookieStoreId;
   let fetchAndRespond = async (cookieDomain) => {
     try {
       const data = await fetchObjectMetadata(
         message.objectType,
         message.recordId,
-        cookieDomain
+        cookieDomain,
+        storeId
       );
       if (!hasSentData) {
         sendSuccess(sendResponse, data);
@@ -174,16 +190,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
     case "copyToClipboard":
       (async () => {
-        // 1. Try navigator.clipboard (service workers, Chrome 121+)
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(message.text);
-            sendResponse({ ok: true });
-            return;
-          }
-        } catch (_) { /* fall through */ }
-
-        // 2. Fallback: offscreen document with execCommand("copy")
+        // Always delegate to the offscreen document. navigator.clipboard in a
+        // service worker can resolve without actually writing to the clipboard
+        // (service workers are never focused), so we skip it entirely and use
+        // the Chrome-sanctioned execCommand path in the offscreen document.
         try {
           await ensureOffscreenDocument();
           chrome.runtime.sendMessage(

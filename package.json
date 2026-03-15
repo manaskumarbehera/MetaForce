@@ -1,12 +1,12 @@
 {
   "name": "metaforce-extension",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "MetaForce browser extension development scripts",
   "scripts": {
     "clean": "node scripts/clean.mjs",
-    "lint": "node --check background.js && node --check contentScript.js && node --check offscreen.js && node --check scripts/build.mjs && node --check scripts/clean.mjs && node --check scripts/package.mjs && node --check test/UrlParserTest.js && node --check test/ClipboardCopyTest.js",
-    "test": "node test/UrlParserTest.js && node test/ClipboardCopyTest.js",
+    "lint": "node --check background.js && node --check contentScript.js && node --check offscreen.js && node --check scripts/build.mjs && node --check scripts/clean.mjs && node --check scripts/package.mjs && node --check test/UrlParserTest.js && node --check test/ClipboardCopyTest.js && node --check test/BackgroundFetchTest.js && node --check test/ValueSearchTest.js && node --check test/InitialBootstrapTest.js",
+    "test": "node test/UrlParserTest.js && node test/ClipboardCopyTest.js && node test/BackgroundFetchTest.js && node test/ValueSearchTest.js && node test/InitialBootstrapTest.js",
     "build": "node scripts/build.mjs",
     "package": "node scripts/package.mjs"
   },
