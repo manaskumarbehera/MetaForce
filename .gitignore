@@ -20,3 +20,10 @@ coverage/
 .idea/
 .vscode/
 
+
+# Dev visual-harness artifacts
+scripts/.harness.*
+
+# Secrets — never commit
+.env
+.env.local

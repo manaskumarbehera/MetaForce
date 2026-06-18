@@ -1,9 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "MetaForce",
-  "version": "0.9",
-  "description": "A browser extension to fetch and view Salesforce object metadata directly from your browser.",
-  "permissions": ["cookies", "clipboardWrite", "offscreen"],
+  "name": "__MSG_extName__",
+  "version": "1.0",
+  "default_locale": "en",
+  "description": "__MSG_extDesc__",
+  "author": "behera.manas98@gmail.com",
+  "permissions": ["cookies", "clipboardWrite", "offscreen", "storage"],
   "host_permissions": [
     "https://*.salesforce.com/*",
     "https://*.visual.force.com/*",
@@ -23,20 +25,35 @@
         "https://*.cloudforce.com/*",
         "https://*.visualforce.com/*"
       ],
-      "js": ["contentScript.js"],
+      "js": ["mf_shared.js", "contentScript.js"],
       "run_at": "document_idle"
     }
   ],
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+M",
+        "mac": "Command+Shift+M"
+      },
+      "description": "Toggle the MetaForce panel on a Salesforce record"
+    }
+  },
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
   "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "__MSG_extName__",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": false
   }
 }

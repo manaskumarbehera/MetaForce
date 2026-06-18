@@ -7,13 +7,24 @@ const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, "..");
 const distDir = path.join(root, "dist");
 
-const requiredFiles = ["manifest.json", "background.js", "contentScript.js", "offscreen.html", "offscreen.js"];
+// Flat runtime files copied verbatim into dist/.
+const requiredFiles = [
+  "manifest.json",
+  "mf_shared.js",
+  "background.js",
+  "contentScript.js",
+  "offscreen.html",
+  "offscreen.js",
+];
 
-for (const file of requiredFiles) {
+// Directories copied recursively into dist/ (extension pages, locales, icons).
+const requiredDirs = ["icons", "popup", "options", "_locales"];
+
+for (const file of [...requiredFiles, ...requiredDirs]) {
   try {
     await access(path.join(root, file));
   } catch {
-    throw new Error(`Missing required file: ${file}`);
+    throw new Error(`Missing required path: ${file}`);
   }
 }
 
@@ -24,9 +35,8 @@ for (const file of requiredFiles) {
   await cp(path.join(root, file), path.join(distDir, file));
 }
 
-await cp(path.join(root, "icons"), path.join(distDir, "icons"), {
-  recursive: true,
-});
+for (const dir of requiredDirs) {
+  await cp(path.join(root, dir), path.join(distDir, dir), { recursive: true });
+}
 
 console.log("Build complete: dist/");
-
