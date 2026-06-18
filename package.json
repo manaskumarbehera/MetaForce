@@ -19,6 +19,8 @@
     "validate": "npm run check:versions && npm run lint && npm test",
     "release:chrome:dry": "node scripts/release-chrome.mjs --dry-run",
     "release:chrome:publish": "node scripts/release-chrome.mjs --publish",
+    "release:edge:dry": "node scripts/release-edge.mjs --dry-run",
+    "release:edge:publish": "node scripts/release-edge.mjs --publish",
     "build": "./build.sh",
     "build:staging": "node scripts/build.mjs",
     "package": "node scripts/package.mjs",
