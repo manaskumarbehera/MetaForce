@@ -1,5 +1,17 @@
+// Shared settings/helpers (see mf_shared.js). importScripts runs synchronously
+// at the top of the classic service worker, so MF is ready for everything below.
+importScripts("mf_shared.js");
+
 let contentScriptLoadedTabs = new Set();
-const API_VERSION = "v58.0";
+
+function getSettings() {
+  return MF.getSettings();
+}
+
+async function getApiVersion() {
+  const settings = await MF.getSettings();
+  return settings.apiVersion || MF.DEFAULT_SETTINGS.apiVersion;
+}
 
 // ── Offscreen document (clipboard) ──────────────────────────────────────────
 let _creatingOffscreen = null;
@@ -15,7 +27,10 @@ async function ensureOffscreenDocument() {
     if (existing.length > 0) return;
   }
 
-  if (_creatingOffscreen) { await _creatingOffscreen; return; }
+  if (_creatingOffscreen) {
+    await _creatingOffscreen;
+    return;
+  }
 
   if (!chrome.offscreen) {
     throw new Error("Offscreen API not available in this browser");
@@ -57,15 +72,20 @@ async function getAuthToken(domain, storeId) {
   });
 }
 
-async function fetchData(url, sidAuthToken) {
-  const response = await fetch(url, {
-    method: "GET",
+async function fetchData(url, sidAuthToken, options = {}) {
+  const { method = "GET", body = null } = options;
+  const init = {
+    method,
     headers: {
       Authorization: `Bearer ${sidAuthToken}`,
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-  });
+  };
+  if (body !== null) {
+    init.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, init);
 
   if (!response.ok) {
     // Salesforce normally returns JSON errors, but intermediary proxies or
@@ -84,13 +104,19 @@ async function fetchData(url, sidAuthToken) {
     throw new Error(errorBody);
   }
 
-  return response.json();
+  // PATCH/DELETE return 204 No Content; reading .json() on an empty body throws.
+  if (response.status === 204) {
+    return {};
+  }
+  const text = await response.text();
+  return text ? JSON.parse(text) : {};
 }
 
 async function fetchObjectMetadata(objectType, recordId, domain, storeId) {
   const sidAuthToken = await getAuthToken(domain, storeId);
-  const endpointMetaUrl = `https://${domain}/services/data/${API_VERSION}/sobjects/${objectType}/describe/`;
-  const endpointRecordUrl = `https://${domain}/services/data/${API_VERSION}/sobjects/${objectType}/${recordId}/`;
+  const apiVersion = await getApiVersion();
+  const endpointMetaUrl = `https://${domain}/services/data/${apiVersion}/sobjects/${objectType}/describe/`;
+  const endpointRecordUrl = `https://${domain}/services/data/${apiVersion}/sobjects/${objectType}/${recordId}/`;
 
   const [metadata, record] = await Promise.all([
     fetchData(endpointMetaUrl, sidAuthToken),
@@ -99,15 +125,74 @@ async function fetchObjectMetadata(objectType, recordId, domain, storeId) {
 
   const combinedData = {};
 
+  // Keep the original { type, value } shape (the Search tab depends on it) and
+  // enrich with describe metadata the All Data tab needs (label, updateable,
+  // referenceTo, nillable). See DOCUMENTATION/architecture.md.
   for (const field of metadata.fields) {
-    const { name, type } = field;
+    const { name, type, label, updateable, referenceTo, nillable } = field;
     combinedData[name] = {
       type,
       value: record[name],
+      label: label || name,
+      updateable: updateable === true,
+      referenceTo: Array.isArray(referenceTo) ? referenceTo : [],
+      nillable: nillable === true,
     };
   }
 
   return combinedData;
+}
+
+// Resolve the org's session cookie domain from a record-page origin. Mirrors the
+// salesforce.com → cloudforce.com fallback used by handleFetchMetadata, exposed
+// as a promise so the update path can reuse it.
+function resolveSessionDomain(baseUrl, storeId) {
+  return new Promise((resolve) => {
+    chrome.cookies.get({ url: baseUrl, name: "sid", storeId }, (cookie) => {
+      if (!cookie) {
+        resolve(null);
+        return;
+      }
+      const [orgId] = cookie.value.split("!");
+      const tryDomain = (domain, next) => {
+        chrome.cookies.getAll({ name: "sid", domain, secure: true, storeId }, (cookies) => {
+          const match = cookies.find((c) => c.value.startsWith(orgId + "!"));
+          if (match) resolve(match.domain);
+          else if (next) next();
+          else resolve(null);
+        });
+      };
+      tryDomain("salesforce.com", () => tryDomain("cloudforce.com", null));
+    });
+  });
+}
+
+// PATCH a single field back to Salesforce. Gated on the enableInlineEdit
+// setting as defense-in-depth (the content script also gates the UI).
+async function handleUpdateField(message, sender, sendResponse) {
+  try {
+    const settings = await getSettings();
+    if (settings.enableInlineEdit !== true) {
+      sendResponse({ error: "Inline editing is disabled in MetaForce settings." });
+      return;
+    }
+    const storeId = sender.tab?.cookieStoreId;
+    const domain = await resolveSessionDomain(message.baseUrl, storeId);
+    if (!domain) {
+      sendResponse({ error: "Salesforce session cookie not found." });
+      return;
+    }
+    const sidAuthToken = await getAuthToken(domain, storeId);
+    const apiVersion = await getApiVersion();
+    const url = `https://${domain}/services/data/${apiVersion}/sobjects/${message.objectType}/${message.recordId}`;
+    await fetchData(url, sidAuthToken, {
+      method: "PATCH",
+      body: { [message.fieldName]: message.value },
+    });
+    sendResponse({ ok: true });
+  } catch (error) {
+    sendResponse({ error: error.message });
+  }
 }
 
 async function handleFetchMetadata(message, sender, sendResponse) {
@@ -150,9 +235,7 @@ async function handleFetchMetadata(message, sender, sendResponse) {
           storeId: sender.tab.cookieStoreId,
         },
         (cookies) => {
-          let sessionCookie = cookies.find((c) =>
-            c.value.startsWith(orgId + "!")
-          );
+          let sessionCookie = cookies.find((c) => c.value.startsWith(orgId + "!"));
           if (sessionCookie) {
             fetchAndRespond(sessionCookie.domain); // Replace fetchObjectMetadata with fetchAndRespond
           } else {
@@ -165,9 +248,7 @@ async function handleFetchMetadata(message, sender, sendResponse) {
                 storeId: sender.tab.cookieStoreId,
               },
               (cookies) => {
-                sessionCookie = cookies.find((c) =>
-                  c.value.startsWith(orgId + "!")
-                );
+                sessionCookie = cookies.find((c) => c.value.startsWith(orgId + "!"));
                 if (sessionCookie) {
                   fetchAndRespond(sessionCookie.domain);
                 } else {
@@ -212,16 +293,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })();
       return true;
     case "CONTENT_SCRIPT_LOADED":
-      if (sender.tab && sender.tab.id)
-        contentScriptLoadedTabs.add(sender.tab.id);
+      if (sender.tab && sender.tab.id) contentScriptLoadedTabs.add(sender.tab.id);
       sendResponse({ status: "ok" });
       break;
     case "fetchMetadata":
     case "handleUrlChange":
       handleFetchMetadata(message, sender, sendResponse);
       return true;
+    case "updateField":
+      handleUpdateField(message, sender, sendResponse);
+      return true;
     default:
       sendResponse({ status: "unexpected_message" });
       break;
   }
 });
+
+// Keyboard shortcut (Ctrl/Cmd+Shift+M) → ask the active tab to toggle the panel.
+if (chrome.commands && chrome.commands.onCommand) {
+  chrome.commands.onCommand.addListener((command) => {
+    if (command !== "toggle-panel") return;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs && tabs[0];
+      if (tab && tab.id != null) {
+        chrome.tabs.sendMessage(
+          tab.id,
+          { action: "togglePanel" },
+          () => void chrome.runtime.lastError
+        );
+      }
+    });
+  });
+}

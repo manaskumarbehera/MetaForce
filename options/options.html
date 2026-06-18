@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MetaForce Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="card">
+      <h1 class="title" data-i18n="optionsTitle">MetaForce Settings</h1>
+
+      <section class="group" aria-labelledby="grp-general">
+        <h2 id="grp-general" class="group-title" data-i18n="settingsGeneral">General</h2>
+
+        <div class="row">
+          <label class="row-label" for="theme" data-i18n="themeLabel">Theme</label>
+          <select id="theme" class="control">
+            <option value="system" data-i18n="themeSystem">Match system</option>
+            <option value="light" data-i18n="themeLight">Light</option>
+            <option value="dark" data-i18n="themeDark">Dark</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label class="row-label" for="density" data-i18n="densityLabel">Density</label>
+          <select id="density" class="control">
+            <option value="comfortable" data-i18n="densityComfortable">Comfortable</option>
+            <option value="compact" data-i18n="densityCompact">Compact</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label class="row-label" for="apiVersion" data-i18n="apiVersionLabel"
+            >Salesforce API version</label
+          >
+          <input id="apiVersion" class="control control--narrow" type="text" placeholder="v67.0" />
+        </div>
+        <p class="hint" data-i18n="apiVersionHint">
+          Used for describe, record, and update REST calls (default v67.0).
+        </p>
+      </section>
+
+      <section class="group" aria-labelledby="grp-alldata">
+        <h2 id="grp-alldata" class="group-title" data-i18n="settingsAllData">All Data tab</h2>
+
+        <div class="row row--toggle">
+          <label class="row-label" for="enableAllData" data-i18n="enableAllDataLabel"
+            >Enable the All Data tab</label
+          >
+          <input id="enableAllData" type="checkbox" class="toggle" />
+        </div>
+        <p class="hint" data-i18n="enableAllDataHint">
+          Adds a tab that lists every field of the record with label, API name, type, and value.
+        </p>
+
+        <div class="row row--toggle">
+          <label class="row-label" for="enableInlineEdit" data-i18n="enableInlineEditLabel"
+            >Allow inline editing in All Data</label
+          >
+          <input id="enableInlineEdit" type="checkbox" class="toggle" />
+        </div>
+        <p class="hint hint--warn" data-i18n="enableInlineEditHint">
+          Double-click an updateable field to edit it and save changes back to Salesforce. Use with
+          care — this writes to live records.
+        </p>
+      </section>
+
+      <footer class="footer">
+        <button id="saveButton" type="button" class="btn btn--primary" data-i18n="saveButton">
+          Save
+        </button>
+        <span id="status" class="status" role="status" aria-live="polite"></span>
+      </footer>
+    </main>
+
+    <script src="../mf_shared.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

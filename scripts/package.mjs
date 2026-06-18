@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,4 +37,3 @@ await new Promise((resolve, reject) => {
 });
 
 console.log(`Package complete: ${zipPath}`);
-

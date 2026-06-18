@@ -1,0 +1,65 @@
+{
+  "extName": {
+    "message": "MetaForce",
+    "description": "Extension name shown in the store and toolbar."
+  },
+  "extDesc": {
+    "message": "Fetch and view Salesforce record metadata in-page — search every field, inspect values, and open a full All Data view.",
+    "description": "Extension description."
+  },
+  "popupTitle": { "message": "MetaForce" },
+  "popupActiveOnSf": { "message": "Active on this Salesforce tab." },
+  "popupInactive": { "message": "Open a Salesforce Lightning record page to use MetaForce." },
+  "popupHint": {
+    "message": "Click the search icon at the edge of the record page to search fields or open All Data."
+  },
+  "openSettings": { "message": "Settings" },
+  "toggleAllData": { "message": "Show \"All Data\" tab" },
+  "toggleInlineEdit": { "message": "Allow inline editing" },
+  "optionsTitle": { "message": "MetaForce Settings" },
+  "settingsGeneral": { "message": "General" },
+  "settingsAllData": { "message": "All Data tab" },
+  "themeLabel": { "message": "Theme" },
+  "themeSystem": { "message": "Match system" },
+  "themeLight": { "message": "Light" },
+  "themeDark": { "message": "Dark" },
+  "apiVersionLabel": { "message": "Salesforce API version" },
+  "apiVersionHint": {
+    "message": "Used for describe, record, and update REST calls (default v67.0)."
+  },
+  "enableAllDataLabel": { "message": "Enable the All Data tab" },
+  "enableAllDataHint": {
+    "message": "Adds a tab that lists every field of the record with label, API name, type, and value."
+  },
+  "enableInlineEditLabel": { "message": "Allow inline editing in All Data" },
+  "enableInlineEditHint": {
+    "message": "Double-click an updateable field to edit it and save changes back to Salesforce. Use with care — this writes to live records."
+  },
+  "saveButton": { "message": "Save" },
+  "settingsSaved": { "message": "Settings saved." },
+  "tabSearch": { "message": "Search" },
+  "tabAllData": { "message": "All Data" },
+  "allDataFilterPlaceholder": { "message": "Filter fields…" },
+  "allDataHideNull": { "message": "Hide empty" },
+  "allDataColLabel": { "message": "Label" },
+  "allDataColApiName": { "message": "API Name" },
+  "allDataColType": { "message": "Type" },
+  "allDataColValue": { "message": "Value" },
+  "allDataLoading": { "message": "Loading fields…" },
+  "allDataSaved": { "message": "Saved" },
+  "allDataSaveFailed": { "message": "Save failed" },
+  "allDataEdit": { "message": "Edit" },
+  "allDataSave": { "message": "Save" },
+  "allDataCancel": { "message": "Cancel" },
+  "allDataBackToRecord": { "message": "Back" },
+  "allDataCopyJson": { "message": "Copy JSON" },
+  "allDataExportCsv": { "message": "CSV" },
+  "allDataCopyValue": { "message": "Copy value" },
+  "allDataCopied": { "message": "Copied!" },
+  "allDataDownloaded": { "message": "Saved" },
+  "allDataPin": { "message": "Pin field" },
+  "allDataUnpin": { "message": "Unpin field" },
+  "densityLabel": { "message": "Density" },
+  "densityComfortable": { "message": "Comfortable" },
+  "densityCompact": { "message": "Compact" }
+}
