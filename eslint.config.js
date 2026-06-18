@@ -37,6 +37,7 @@ const nodeGlobals = {
   global: "writable",
   fetch: "readonly",
   URLSearchParams: "readonly",
+  setTimeout: "readonly",
 };
 
 const jestGlobals = {

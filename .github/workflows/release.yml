@@ -24,6 +24,9 @@ jobs:
       CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
       CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
       CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,6 +43,17 @@ jobs:
           else
             npm run release:chrome:dry
           fi
-      - name: Skip (unconfigured)
+      - name: Skip Chrome (unconfigured)
         if: ${{ env.CHROME_EXTENSION_ID == '' }}
         run: echo "::notice::CHROME_EXTENSION_ID secret not set — skipping Chrome Web Store release."
+      - name: Edge Add-ons release
+        if: ${{ env.EDGE_PRODUCT_ID != '' && env.EDGE_API_KEY != '' }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish }}" = "true" ]; then
+            npm run release:edge:publish
+          else
+            npm run release:edge:dry
+          fi
+      - name: Skip Edge (unconfigured)
+        if: ${{ env.EDGE_PRODUCT_ID == '' || env.EDGE_API_KEY == '' }}
+        run: echo "::notice::Edge credentials not set — skipping Edge Add-ons release."
