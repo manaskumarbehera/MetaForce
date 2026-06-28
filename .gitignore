@@ -27,3 +27,4 @@ scripts/.harness.*
 # Secrets — never commit
 .env
 .env.local
+.edge-certification-notes.txt
