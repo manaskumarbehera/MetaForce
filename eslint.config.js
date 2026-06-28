@@ -36,6 +36,7 @@ const nodeGlobals = {
   console: "readonly",
   global: "writable",
   fetch: "readonly",
+  URL: "readonly",
   URLSearchParams: "readonly",
   setTimeout: "readonly",
   clearTimeout: "readonly",
