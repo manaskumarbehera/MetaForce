@@ -29,12 +29,33 @@ Credentials live in `.env` (gitignored): `EDGE_PRODUCT_ID`, `EDGE_CLIENT_ID`,
 
 ## What the Edge Add-ons API can / cannot do
 
-The Update API (v1.1) **only**: uploads the package to the draft, and submits
-the draft for certification with a `notes` field. It **cannot** edit listing
-metadata. **Website URL, screenshots, description, privacy/support links, and
-the "Notes for certification" listing field are all manual in Partner Center.**
-Same boundary for Chrome (the API publishes; the listing is edited in the dev
-console).
+The Update API (v1.1) has **exactly four endpoints**: upload package to draft,
+check upload status, publish submission (body = `{ "notes": "..." }` for
+certification only), check publish status. That's it.
+
+It **cannot** edit listing metadata. Microsoft's own docs are explicit:
+
+> "There aren't REST API endpoints for … Updating a product's metadata, such as
+> the description. To … update a product's metadata, you must use Microsoft
+> Partner Center."
+> — learn.microsoft.com/microsoft-edge/extensions/update/api/using-addons-api
+
+So **Website URL, privacy policy URL, the Privacy page (permission
+justifications, data-use disclosures), screenshots, description, support links,
+and the "Notes for certification" listing field are ALL manual in Partner
+Center.** No API, no script, reaches them. Same boundary for Chrome (the API
+publishes; the listing is edited in the dev console). Do not promise to "fill
+them via API" — there is no endpoint.
+
+## Privacy / data-use page (Partner Center, manual)
+
+- Privacy policy URL to use: `https://github.com/manaskumarbehera/MetaForce/blob/main/PRIVACY.md`
+  (the repo's `PRIVACY.md` — public, resolves).
+- Paste-ready answers for the Privacy page (single purpose, permission
+  justifications for `cookies`/`storage`/`clipboardWrite`/`offscreen`/host
+  perms, data-use certifications): `DOCUMENTATION/store-privacy-answers.md`.
+- MetaForce collects no personal data; only network calls are to the user's own
+  Salesforce org REST API.
 
 ## Certification notes (reviewer test login)
 
