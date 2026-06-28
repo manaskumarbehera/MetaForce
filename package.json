@@ -17,6 +17,7 @@
     "harness": "node scripts/make-harness.mjs",
     "check:versions": "node scripts/check-version-consistency.cjs",
     "validate": "npm run check:versions && npm run lint && npm test",
+    "release": "node scripts/release-all.mjs",
     "chrome:auth": "node scripts/chrome-oauth-token.mjs --write",
     "release:chrome:dry": "node scripts/release-chrome.mjs --dry-run",
     "release:chrome:publish": "node scripts/release-chrome.mjs --publish",
