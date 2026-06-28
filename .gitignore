@@ -23,6 +23,7 @@ coverage/
 
 # Dev visual-harness artifacts
 scripts/.harness.*
+scripts/.harness-shots/
 
 # Secrets — never commit
 .env
