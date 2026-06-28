@@ -138,6 +138,35 @@
     return lines.join("\r\n");
   }
 
+  // Build a ready-to-run SOQL query from the record's fields. Id is forced first
+  // (Salesforce convention); duplicates and empties are dropped. The recordId is
+  // single-quote-escaped defensively even though Salesforce IDs never contain one.
+  function recordToSoql(rows, objectType, recordId) {
+    const seen = new Set();
+    const fields = [];
+    (rows || []).forEach((row) => {
+      const f = row && row.Field;
+      if (f && !seen.has(f)) {
+        seen.add(f);
+        fields.push(f);
+      }
+    });
+    const idAt = fields.indexOf("Id");
+    if (idAt > 0) fields.splice(idAt, 1);
+    if (idAt !== 0) fields.unshift("Id");
+    let soql = `SELECT ${fields.join(", ")}\nFROM ${objectType || "SObject"}`;
+    if (recordId) soql += `\nWHERE Id = '${String(recordId).replace(/'/g, "\\'")}'`;
+    return soql;
+  }
+
+  // URL of the org's Developer Console. It lives on the instance
+  // (my.salesforce.com) domain, so map a Lightning host across; other hosts
+  // (already my.salesforce.com, Classic, VF) are used as-is.
+  function devConsoleUrl(hostname) {
+    const h = String(hostname || "").replace(/\.lightning\.force\.com$/, ".my.salesforce.com");
+    return `https://${h}/_ui/common/apex/debug/ApexCSIPage`;
+  }
+
   root.MF = {
     SETTINGS_KEY,
     FAVORITES_KEY,
@@ -149,6 +178,8 @@
     fieldKind,
     recordToJson,
     recordToCsv,
+    recordToSoql,
+    devConsoleUrl,
     escapeCsv,
   };
 })(typeof self !== "undefined" ? self : this);

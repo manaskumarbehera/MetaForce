@@ -946,7 +946,22 @@ function buildAllDataPane() {
   csvBtn.className = "mf-ad-export-btn";
   csvBtn.textContent = mfI18n("allDataExportCsv", "CSV");
   csvBtn.addEventListener("click", () => exportAllData("csv", csvBtn));
-  actions.append(jsonBtn, csvBtn);
+  const soqlBtn = document.createElement("button");
+  soqlBtn.type = "button";
+  soqlBtn.className = "mf-ad-export-btn";
+  soqlBtn.textContent = mfI18n("allDataCopySoql", "Copy SOQL");
+  soqlBtn.title = mfI18n("allDataCopySoqlTitle", "Copy a SELECT query for this record");
+  soqlBtn.addEventListener("click", () => exportAllData("soql", soqlBtn));
+  const consoleBtn = document.createElement("button");
+  consoleBtn.type = "button";
+  consoleBtn.className = "mf-ad-export-btn";
+  consoleBtn.textContent = mfI18n("allDataOpenConsole", "Dev Console");
+  consoleBtn.title = mfI18n(
+    "allDataOpenConsoleTitle",
+    "Copy the SOQL and open the Developer Console"
+  );
+  consoleBtn.addEventListener("click", () => exportAllData("devconsole", consoleBtn));
+  actions.append(jsonBtn, csvBtn, soqlBtn, consoleBtn);
 
   toolbar.append(filter, hideNullLabel, actions);
 
@@ -1066,11 +1081,14 @@ function mfAllDataValueText(row) {
   return String(v);
 }
 
-function renderAllDataRows() {
-  if (!mfAd || !mfAdContext) return;
-  const q = (mfAd.filterText || "").toLowerCase();
-  const hideNull = mfAd.hideNull.checked;
-  const rows = mfAdContext.rows.filter((row) => {
+// The rows currently visible in the All Data table — after the filter text and
+// "Hide empty" toggle, before the favorites sort. Shared by the renderer and the
+// SOQL / Dev-Console export so they reflect exactly what the user sees.
+function mfAllDataVisibleRows() {
+  if (!mfAdContext) return [];
+  const q = ((mfAd && mfAd.filterText) || "").toLowerCase();
+  const hideNull = !!(mfAd && mfAd.hideNull && mfAd.hideNull.checked);
+  return mfAdContext.rows.filter((row) => {
     const text = mfAllDataValueText(row);
     if (hideNull && text === "") return false;
     if (!q) return true;
@@ -1080,6 +1098,11 @@ function renderAllDataRows() {
       text.toLowerCase().includes(q)
     );
   });
+}
+
+function renderAllDataRows() {
+  if (!mfAd || !mfAdContext) return;
+  const rows = mfAllDataVisibleRows();
   // Pinned fields float to the top (Array.sort is stable, so the rest keep order).
   const favs = mfAd.favorites || new Set();
   rows.sort((a, b) => (favs.has(b.Field) ? 1 : 0) - (favs.has(a.Field) ? 1 : 0));
@@ -1231,6 +1254,25 @@ async function exportAllData(kind, btn) {
       flash(mfI18n("allDataCopied", "Copied!"));
     } catch (_) {
       showStatusNotice("Copy failed.", "error");
+    }
+  } else if (kind === "soql" || kind === "devconsole") {
+    // SOQL reflects exactly the fields on screen (filter + Hide empty applied).
+    const soql = MF.recordToSoql(
+      mfAllDataVisibleRows(),
+      mfAdContext.objectType,
+      mfAdContext.recordId
+    );
+    try {
+      await copyToClipboard(soql);
+    } catch (_) {
+      showStatusNotice("Copy failed.", "error");
+      return;
+    }
+    if (kind === "devconsole") {
+      window.open(MF.devConsoleUrl(window.location.hostname), "_blank", "noopener");
+      flash(mfI18n("allDataOpened", "Opened"));
+    } else {
+      flash(mfI18n("allDataCopied", "Copied!"));
     }
   } else {
     mfDownload(

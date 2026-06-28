@@ -71,6 +71,48 @@ describe("recordToCsv", () => {
   });
 });
 
+describe("recordToSoql", () => {
+  test("builds a SELECT … FROM … WHERE Id query with Id forced first", () => {
+    const rows = [
+      { Field: "Name" },
+      { Field: "OwnerId" },
+      { Field: "Id" },
+      { Field: "AnnualRevenue" },
+    ];
+    const soql = MF.recordToSoql(rows, "Account", "001xx0000000001AAA");
+    expect(soql).toBe(
+      "SELECT Id, Name, OwnerId, AnnualRevenue\nFROM Account\nWHERE Id = '001xx0000000001AAA'"
+    );
+  });
+  test("prepends Id when the record has no Id row, and dedupes fields", () => {
+    const rows = [{ Field: "Name" }, { Field: "Name" }, { Field: "Phone" }, { Field: "" }];
+    expect(MF.recordToSoql(rows, "Contact", "003")).toBe(
+      "SELECT Id, Name, Phone\nFROM Contact\nWHERE Id = '003'"
+    );
+  });
+  test("omits the WHERE clause when no recordId and falls back on object name", () => {
+    expect(MF.recordToSoql([{ Field: "Id" }], "", null)).toBe("SELECT Id\nFROM SObject");
+  });
+  test("escapes a single quote in the record id defensively", () => {
+    expect(MF.recordToSoql([{ Field: "Id" }], "Account", "a'b")).toBe(
+      "SELECT Id\nFROM Account\nWHERE Id = 'a\\'b'"
+    );
+  });
+});
+
+describe("devConsoleUrl", () => {
+  test("maps a Lightning host to the my.salesforce.com instance domain", () => {
+    expect(MF.devConsoleUrl("acme.lightning.force.com")).toBe(
+      "https://acme.my.salesforce.com/_ui/common/apex/debug/ApexCSIPage"
+    );
+  });
+  test("leaves a my.salesforce.com host unchanged", () => {
+    expect(MF.devConsoleUrl("acme.my.salesforce.com")).toBe(
+      "https://acme.my.salesforce.com/_ui/common/apex/debug/ApexCSIPage"
+    );
+  });
+});
+
 describe("favorites sort (mirrors renderAllDataRows)", () => {
   function sortFavoritesFirst(rows, favSet) {
     const copy = rows.slice();

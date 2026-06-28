@@ -44,7 +44,7 @@ const panel = `
       <div class="mf-ad-toolbar">
         <input class="mf-ad-filter" placeholder="Filter fields…" />
         <label class="mf-ad-hidenull"><input type="checkbox"/> <span>Hide empty</span></label>
-        <div class="mf-ad-actions"><button class="mf-ad-export-btn">Copy JSON</button><button class="mf-ad-export-btn">CSV</button></div>
+        <div class="mf-ad-actions"><button class="mf-ad-export-btn">Copy JSON</button><button class="mf-ad-export-btn">CSV</button><button class="mf-ad-export-btn">Copy SOQL</button><button class="mf-ad-export-btn">Dev Console</button></div>
       </div>
       <div class="mf-ad-count">63 / 63 fields</div>
       <div class="mf-ad-tablewrap">
