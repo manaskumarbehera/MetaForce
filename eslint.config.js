@@ -38,6 +38,9 @@ const nodeGlobals = {
   fetch: "readonly",
   URLSearchParams: "readonly",
   setTimeout: "readonly",
+  clearTimeout: "readonly",
+  setInterval: "readonly",
+  clearInterval: "readonly",
 };
 
 const jestGlobals = {
@@ -91,8 +94,8 @@ module.exports = [
     },
   },
   {
-    // Dev tooling (ES module scripts and Vite config).
-    files: ["scripts/**/*.mjs", "*.mjs"],
+    // Dev tooling (ES module scripts, skill drivers, and Vite config).
+    files: ["scripts/**/*.mjs", ".claude/**/*.mjs", "*.mjs"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",

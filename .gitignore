@@ -23,7 +23,9 @@ coverage/
 
 # Dev visual-harness artifacts
 scripts/.harness.*
+scripts/.harness-shots/
 
 # Secrets — never commit
 .env
 .env.local
+.edge-certification-notes.txt

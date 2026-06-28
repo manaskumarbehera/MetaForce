@@ -16,8 +16,18 @@
  *   EDGE_API_KEY       API key for that client ID.
  *
  * SAFETY: publish is opt-in. Without --publish the script uploads the package to
- * the draft and stops. Submission notes (e.g. the reviewer test login) are set in
- * Partner Center → Extension → Availability, NOT here.
+ * the draft and stops.
+ *
+ * Certification notes (reviewer test login + steps) are sent with the publish
+ * call via the submission `notes` field. Source order:
+ *   1. EDGE_CERT_NOTES env var (inline text), else
+ *   2. .edge-certification-notes.txt at repo root (gitignored — keep the
+ *      Salesforce test password here, NOT in git), else
+ *   3. a bare "MetaForce vX.Y" fallback.
+ * The API `notes` field does NOT replace the Partner Center "Notes for
+ * certification" listing field — set that in the UI too. Listing metadata
+ * (website URL, screenshots, privacy/support links) is NOT settable via this
+ * API; edit it in Partner Center.
  * NOTE: untested end-to-end until Partner Center credentials are provided.
  */
 
@@ -129,11 +139,13 @@ if (DRY_RUN || !PUBLISH) {
   process.exit(0);
 }
 
+const certNotes = resolveCertNotes(version);
 log("Submitting for certification...");
+log(`  notes source: ${certNotes.source} (${certNotes.text.length} chars)`);
 const pubRes = await fetch(`${API}/v1/products/${productId}/submissions`, {
   method: "POST",
   headers: { ...authHeaders, "Content-Type": "application/json" },
-  body: JSON.stringify({ notes: `MetaForce v${version}` }),
+  body: JSON.stringify({ notes: certNotes.text }),
 });
 if (pubRes.status !== 202) {
   logErr(`Publish HTTP ${pubRes.status} ${pubRes.statusText}: ${await pubRes.text()}`);
@@ -143,6 +155,23 @@ const pubOpId = pubRes.headers.get("location");
 await pollOperation(`/v1/products/${productId}/submissions/operations/${pubOpId}`, "publish");
 logOk(`Version ${version} submitted to the Edge Add-ons store for certification.`);
 log("Partner Center: https://partner.microsoft.com/dashboard/microsoftedge/overview");
+
+// ─── Helper: resolve the certification notes sent with the submission ────────
+function resolveCertNotes(ver) {
+  const env = process.env.EDGE_CERT_NOTES;
+  if (env && env.trim()) return { text: env.trim(), source: "EDGE_CERT_NOTES env" };
+  const notesPath = path.join(ROOT, ".edge-certification-notes.txt");
+  if (fs.existsSync(notesPath)) {
+    const text = fs.readFileSync(notesPath, "utf8").trim();
+    if (text) return { text, source: ".edge-certification-notes.txt" };
+  }
+  logErr("No certification notes found — sending a bare fallback.");
+  logErr("  1.3.1 (Product is Testable) needs a reviewer test login + steps.");
+  logErr(
+    "  Create .edge-certification-notes.txt (see DOCUMENTATION/certification-notes.template.md)."
+  );
+  return { text: `MetaForce v${ver}`, source: "fallback (no notes provided)" };
+}
 
 // ─── Helper: poll an async operation until it succeeds or fails ───────────────
 async function pollOperation(opPath, label) {

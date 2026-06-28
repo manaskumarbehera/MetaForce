@@ -29,10 +29,35 @@ async operation), and — only with `--publish` — submits for certification.
 
 ## Reviewer test login
 
-Edge certification needs the same Salesforce test account as Chrome. It is **not**
-set by the API — enter it in Partner Center → Extension → **Availability →
-"Notes for certification"** (username, password, and steps to reach the in-page
-panel on a Salesforce record).
+Edge certification needs a Salesforce test account (same as Chrome). Two channels —
+use **both**:
+
+1. **Partner Center → Extension → Availability → "Notes for certification"** — the
+   field the reviewer reads. Set it in the UI.
+2. **The submission `notes` field** sent by `release-edge.mjs`. Put the text in
+   `.edge-certification-notes.txt` (repo root, gitignored) or the `EDGE_CERT_NOTES`
+   env var. Template + paste-ready text: `DOCUMENTATION/certification-notes.template.md`.
+
+## What the API can and cannot do
+
+The Edge Add-ons Update API (v1.1) **only** uploads the package and submits the
+draft for certification (with a `notes` field). It **cannot** edit listing
+metadata — **website URL, screenshots, description, privacy/support links, and
+the "Notes for certification" listing field are all manual in Partner Center.**
+
+## Handling a certification rejection
+
+Reports list the failed policy. Two we have hit:
+
+- **1.1.3 Distinct Function & Value / Accurate Representation — "URLs did not
+  resolve."** A URL in the listing (Website / Support / Privacy) points somewhere
+  dead. Fix in **Partner Center → Properties** (API can't). Use the public repo
+  as the website URL: `https://github.com/manaskumarbehera/MetaForce`. The
+  Website field is optional — leave it blank rather than point it anywhere that
+  doesn't resolve. Verify every URL field resolves before resubmitting.
+- **1.3.1 Product is Testable.** The reviewer couldn't exercise the extension —
+  it needs a Salesforce login + steps (see "Reviewer test login" above). Confirm
+  the test account still logs in.
 
 ## Status
 
