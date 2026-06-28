@@ -48,7 +48,10 @@ background issues a `PATCH` to
 - **Export** — _Copy JSON_ puts `{ apiName: value }` on the clipboard; _CSV_
   downloads `Label,API Name,Type,Value` as `<Object>_<Id>.csv`; _Copy SOQL_
   copies a ready-to-run `SELECT <fields> FROM <Object> WHERE Id = '<Id>'` query
-  (Id forced first) — paste straight into the Developer Console / Workbench.
+  (Id forced first). The SOQL reflects exactly the fields currently shown — apply
+  the filter / _Hide empty_ first to narrow the `SELECT` list.
+- **Dev Console** — copies the same SOQL **and** opens the org's Developer
+  Console in a new tab, so you can paste and run immediately.
 
 ## Settings that affect it
 

@@ -100,6 +100,19 @@ describe("recordToSoql", () => {
   });
 });
 
+describe("devConsoleUrl", () => {
+  test("maps a Lightning host to the my.salesforce.com instance domain", () => {
+    expect(MF.devConsoleUrl("acme.lightning.force.com")).toBe(
+      "https://acme.my.salesforce.com/_ui/common/apex/debug/ApexCSIPage"
+    );
+  });
+  test("leaves a my.salesforce.com host unchanged", () => {
+    expect(MF.devConsoleUrl("acme.my.salesforce.com")).toBe(
+      "https://acme.my.salesforce.com/_ui/common/apex/debug/ApexCSIPage"
+    );
+  });
+});
+
 describe("favorites sort (mirrors renderAllDataRows)", () => {
   function sortFavoritesFirst(rows, favSet) {
     const copy = rows.slice();

@@ -159,6 +159,14 @@
     return soql;
   }
 
+  // URL of the org's Developer Console. It lives on the instance
+  // (my.salesforce.com) domain, so map a Lightning host across; other hosts
+  // (already my.salesforce.com, Classic, VF) are used as-is.
+  function devConsoleUrl(hostname) {
+    const h = String(hostname || "").replace(/\.lightning\.force\.com$/, ".my.salesforce.com");
+    return `https://${h}/_ui/common/apex/debug/ApexCSIPage`;
+  }
+
   root.MF = {
     SETTINGS_KEY,
     FAVORITES_KEY,
@@ -171,6 +179,7 @@
     recordToJson,
     recordToCsv,
     recordToSoql,
+    devConsoleUrl,
     escapeCsv,
   };
 })(typeof self !== "undefined" ? self : this);
