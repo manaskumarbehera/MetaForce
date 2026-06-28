@@ -54,6 +54,8 @@
   "allDataBackToRecord": { "message": "Back" },
   "allDataCopyJson": { "message": "Copy JSON" },
   "allDataExportCsv": { "message": "CSV" },
+  "allDataCopySoql": { "message": "Copy SOQL" },
+  "allDataCopySoqlTitle": { "message": "Copy a SELECT query for this record" },
   "allDataCopyValue": { "message": "Copy value" },
   "allDataCopied": { "message": "Copied!" },
   "allDataDownloaded": { "message": "Saved" },

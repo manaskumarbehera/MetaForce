@@ -946,7 +946,13 @@ function buildAllDataPane() {
   csvBtn.className = "mf-ad-export-btn";
   csvBtn.textContent = mfI18n("allDataExportCsv", "CSV");
   csvBtn.addEventListener("click", () => exportAllData("csv", csvBtn));
-  actions.append(jsonBtn, csvBtn);
+  const soqlBtn = document.createElement("button");
+  soqlBtn.type = "button";
+  soqlBtn.className = "mf-ad-export-btn";
+  soqlBtn.textContent = mfI18n("allDataCopySoql", "Copy SOQL");
+  soqlBtn.title = mfI18n("allDataCopySoqlTitle", "Copy a SELECT query for this record");
+  soqlBtn.addEventListener("click", () => exportAllData("soql", soqlBtn));
+  actions.append(jsonBtn, csvBtn, soqlBtn);
 
   toolbar.append(filter, hideNullLabel, actions);
 
@@ -1228,6 +1234,13 @@ async function exportAllData(kind, btn) {
   if (kind === "json") {
     try {
       await copyToClipboard(MF.recordToJson(rows));
+      flash(mfI18n("allDataCopied", "Copied!"));
+    } catch (_) {
+      showStatusNotice("Copy failed.", "error");
+    }
+  } else if (kind === "soql") {
+    try {
+      await copyToClipboard(MF.recordToSoql(rows, mfAdContext.objectType, mfAdContext.recordId));
       flash(mfI18n("allDataCopied", "Copied!"));
     } catch (_) {
       showStatusNotice("Copy failed.", "error");

@@ -46,7 +46,9 @@ background issues a `PATCH` to
   object.
 - **Per-row copy** — a copy button on each value cell.
 - **Export** — _Copy JSON_ puts `{ apiName: value }` on the clipboard; _CSV_
-  downloads `Label,API Name,Type,Value` as `<Object>_<Id>.csv`.
+  downloads `Label,API Name,Type,Value` as `<Object>_<Id>.csv`; _Copy SOQL_
+  copies a ready-to-run `SELECT <fields> FROM <Object> WHERE Id = '<Id>'` query
+  (Id forced first) — paste straight into the Developer Console / Workbench.
 
 ## Settings that affect it
 
