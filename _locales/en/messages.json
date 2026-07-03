@@ -66,5 +66,43 @@
   "allDataUnpin": { "message": "Unpin field" },
   "densityLabel": { "message": "Density" },
   "densityComfortable": { "message": "Comfortable" },
-  "densityCompact": { "message": "Compact" }
+  "densityCompact": { "message": "Compact" },
+  "triggerPositionLabel": { "message": "MetaForce button position" },
+  "triggerPosMiddle": { "message": "Right edge, middle (recommended)" },
+  "triggerPosTop": { "message": "Top right" },
+  "triggerPosBottom": { "message": "Bottom right" },
+  "triggerPositionHint": {
+    "message": "Middle-right stays clear of Salesforce's own Help and chat buttons."
+  },
+  "settingsShortcuts": { "message": "Keyboard shortcuts" },
+  "shortcutTogglePanel": { "message": "Open / close MetaForce" },
+  "shortcutNextTab": { "message": "Next tab (Search ⇄ All Data)" },
+  "shortcutPrevTab": { "message": "Previous tab" },
+  "shortcutReset": { "message": "Reset" },
+  "shortcutPressKeys": { "message": "Press keys… (Esc cancels)" },
+  "shortcutNeedModifier": { "message": "Include Ctrl, Cmd, or Alt. Free combos:" },
+  "shortcutReserved": {
+    "message": "The browser reserves that combo — it can't be overridden. Free combos:"
+  },
+  "shortcutDuplicate": {
+    "message": "Already used by another MetaForce shortcut — pick a different combo."
+  },
+  "shortcutDiscouraged": {
+    "message": "Set — note this combo shadows a common browser action on Salesforce pages. Click Save to apply."
+  },
+  "shortcutSet": { "message": "Shortcut set — click Save to apply." },
+  "shortcutHint": {
+    "message": "Click a shortcut, then press the keys you want (include Ctrl, Cmd, or Alt). Shortcuts work while a Salesforce page is focused. Combos the browser reserves — Ctrl/Cmd+T, W, N, Cmd+Q… — can't be overridden, so MetaForce won't let you pick them."
+  },
+  "whatsNewTitle": { "message": "What's new in MetaForce" },
+  "whatsNewToggle": { "message": "opens and closes this panel from the keyboard." },
+  "whatsNewTabs": { "message": "switch between the Search and All Data tabs." },
+  "whatsNewPosition": {
+    "message": "The MetaForce button now sits at the middle of the right edge, away from Salesforce's own buttons."
+  },
+  "whatsNewCustomize": {
+    "message": "Both the shortcuts and the button position are yours to change in Settings."
+  },
+  "whatsNewOpenSettings": { "message": "Open settings" },
+  "whatsNewDismiss": { "message": "Got it" }
 }

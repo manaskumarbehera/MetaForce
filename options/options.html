@@ -30,6 +30,22 @@
         </div>
 
         <div class="row">
+          <label class="row-label" for="triggerPosition" data-i18n="triggerPositionLabel"
+            >MetaForce button position</label
+          >
+          <select id="triggerPosition" class="control">
+            <option value="middle-right" data-i18n="triggerPosMiddle">
+              Right edge, middle (recommended)
+            </option>
+            <option value="top-right" data-i18n="triggerPosTop">Top right</option>
+            <option value="bottom-right" data-i18n="triggerPosBottom">Bottom right</option>
+          </select>
+        </div>
+        <p class="hint" data-i18n="triggerPositionHint">
+          Middle-right stays clear of Salesforce's own Help and chat buttons.
+        </p>
+
+        <div class="row">
           <label class="row-label" for="apiVersion" data-i18n="apiVersionLabel"
             >Salesforce API version</label
           >
@@ -37,6 +53,88 @@
         </div>
         <p class="hint" data-i18n="apiVersionHint">
           Used for describe, record, and update REST calls (default v67.0).
+        </p>
+      </section>
+
+      <section class="group" aria-labelledby="grp-shortcuts">
+        <h2 id="grp-shortcuts" class="group-title" data-i18n="settingsShortcuts">
+          Keyboard shortcuts
+        </h2>
+
+        <div class="row">
+          <span class="row-label" id="lbl-sc-togglePanel" data-i18n="shortcutTogglePanel"
+            >Open / close MetaForce</span
+          >
+          <span class="shortcut-controls">
+            <button
+              type="button"
+              id="sc-togglePanel"
+              class="control shortcut-btn"
+              aria-labelledby="lbl-sc-togglePanel"
+              aria-describedby="shortcutStatus"
+            ></button>
+            <button
+              type="button"
+              class="shortcut-reset"
+              data-reset="togglePanel"
+              data-i18n="shortcutReset"
+            >
+              Reset
+            </button>
+          </span>
+        </div>
+
+        <div class="row">
+          <span class="row-label" id="lbl-sc-nextTab" data-i18n="shortcutNextTab"
+            >Next tab (Search ⇄ All Data)</span
+          >
+          <span class="shortcut-controls">
+            <button
+              type="button"
+              id="sc-nextTab"
+              class="control shortcut-btn"
+              aria-labelledby="lbl-sc-nextTab"
+              aria-describedby="shortcutStatus"
+            ></button>
+            <button
+              type="button"
+              class="shortcut-reset"
+              data-reset="nextTab"
+              data-i18n="shortcutReset"
+            >
+              Reset
+            </button>
+          </span>
+        </div>
+
+        <div class="row">
+          <span class="row-label" id="lbl-sc-prevTab" data-i18n="shortcutPrevTab"
+            >Previous tab</span
+          >
+          <span class="shortcut-controls">
+            <button
+              type="button"
+              id="sc-prevTab"
+              class="control shortcut-btn"
+              aria-labelledby="lbl-sc-prevTab"
+              aria-describedby="shortcutStatus"
+            ></button>
+            <button
+              type="button"
+              class="shortcut-reset"
+              data-reset="prevTab"
+              data-i18n="shortcutReset"
+            >
+              Reset
+            </button>
+          </span>
+        </div>
+
+        <p id="shortcutStatus" class="hint" role="status" aria-live="polite"></p>
+        <p class="hint" data-i18n="shortcutHint">
+          Click a shortcut, then press the keys you want (include Ctrl, Cmd, or Alt). Shortcuts work
+          while a Salesforce page is focused. Combos the browser reserves — Ctrl/Cmd+T, W, N, Cmd+Q…
+          — can't be overridden, so MetaForce won't let you pick them.
         </p>
       </section>
 

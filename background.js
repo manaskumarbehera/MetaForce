@@ -303,25 +303,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "updateField":
       handleUpdateField(message, sender, sendResponse);
       return true;
+    case "openOptionsPage":
+      // Content scripts can't open the options page themselves ("What's new"
+      // callout → Open settings).
+      chrome.runtime.openOptionsPage(() => void chrome.runtime.lastError);
+      sendResponse({ ok: true });
+      break;
     default:
       sendResponse({ status: "unexpected_message" });
       break;
   }
 });
 
-// Keyboard shortcut (Ctrl/Cmd+Shift+M) → ask the active tab to toggle the panel.
-if (chrome.commands && chrome.commands.onCommand) {
-  chrome.commands.onCommand.addListener((command) => {
-    if (command !== "toggle-panel") return;
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs && tabs[0];
-      if (tab && tab.id != null) {
-        chrome.tabs.sendMessage(
-          tab.id,
-          { action: "togglePanel" },
-          () => void chrome.runtime.lastError
-        );
-      }
-    });
-  });
-}
+// The panel-toggle keyboard shortcut is user-configurable and handled entirely
+// by the content script (see mf_shared.js shortcut helpers) — the old fixed
+// chrome.commands "toggle-panel" binding was removed so the two never double-fire.

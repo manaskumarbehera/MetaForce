@@ -8,6 +8,7 @@
   --accent-text: #ffffff;
   --grad: linear-gradient(135deg, #2563eb, #7c3aed);
   --warn: #b4690e;
+  --error: #d3303f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,6 +22,7 @@
     --accent-text: #0b1018;
     --grad: linear-gradient(135deg, #3b6ef0, #8b5cf6);
     --warn: #e0a541;
+    --error: #ff7382;
   }
 }
 
@@ -116,6 +118,51 @@ body {
 
 .hint--warn {
   color: var(--warn);
+}
+
+.hint--error {
+  color: var(--error);
+}
+
+/* ── Shortcut recorder ─────────────────────────────────────────────
+   Colors come from the :root tokens, which flip in the dark scheme above. */
+.shortcut-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shortcut-btn {
+  min-width: 150px;
+  cursor: pointer;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.shortcut-btn:hover {
+  border-color: var(--accent);
+}
+
+.shortcut-btn.recording {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.shortcut-reset {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.shortcut-reset:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .footer {

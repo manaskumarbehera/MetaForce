@@ -36,6 +36,153 @@ function showStatus() {
   setTimeout(() => status.classList.remove("show"), 1800);
 }
 
+function msg(key, fallback) {
+  try {
+    return chrome.i18n.getMessage(key) || fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+// ── Shortcut recorder ────────────────────────────────────────────────────────
+// Click a shortcut button → it waits for a key combo. Validation lives in
+// mf_shared.js (modifier required, browser-reserved combos rejected).
+const SHORTCUT_ACTIONS = ["togglePanel", "nextTab", "prevTab"];
+const IS_MAC = /mac/i.test(navigator.platform || "");
+
+function setupShortcutRecorder(shortcuts) {
+  const statusEl = document.getElementById("shortcutStatus");
+  let recording = null; // action name while waiting for keys
+
+  const suggestionText = () => {
+    const taken = SHORTCUT_ACTIONS.map((a) => shortcuts[a]);
+    return MF.SHORTCUT_SUGGESTIONS.filter((s) => !taken.some((t) => MF.shortcutsEqual(s, t)))
+      .map((s) => MF.formatShortcut(s, IS_MAC))
+      .join(", ");
+  };
+
+  const setStatus = (text, kind) => {
+    statusEl.textContent = text;
+    statusEl.classList.toggle("hint--warn", kind === "warn");
+    statusEl.classList.toggle("hint--error", kind === "error");
+  };
+
+  const render = () => {
+    SHORTCUT_ACTIONS.forEach((action) => {
+      const btn = document.getElementById("sc-" + action);
+      btn.classList.toggle("recording", recording === action);
+      btn.textContent =
+        recording === action
+          ? msg("shortcutPressKeys", "Press keys… (Esc cancels)")
+          : MF.formatShortcut(shortcuts[action], IS_MAC);
+    });
+  };
+
+  const stopRecording = () => {
+    recording = null;
+    render();
+  };
+
+  SHORTCUT_ACTIONS.forEach((action) => {
+    const btn = document.getElementById("sc-" + action);
+
+    btn.addEventListener("click", () => {
+      recording = action;
+      setStatus(msg("shortcutPressKeys", "Press keys… (Esc cancels)"), "");
+      render();
+    });
+
+    btn.addEventListener("blur", () => {
+      if (recording === action) {
+        stopRecording();
+        setStatus("", "");
+      }
+    });
+
+    btn.addEventListener("keydown", (event) => {
+      if (recording !== action) {
+        // Not recording: Enter/Space activate the button normally.
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.key === "Escape") {
+        stopRecording();
+        setStatus("", "");
+        return;
+      }
+
+      const descriptor = MF.shortcutFromEvent(event);
+      if (!descriptor) {
+        // Only modifiers held so far — show the combo building up.
+        btn.textContent = MF.formatShortcut(
+          {
+            ctrl: event.ctrlKey,
+            alt: event.altKey,
+            shift: event.shiftKey,
+            meta: event.metaKey,
+            code: "Pending",
+            key: "…",
+          },
+          IS_MAC
+        );
+        return;
+      }
+
+      const verdict = MF.validateShortcut(descriptor, IS_MAC);
+      if (!verdict.ok) {
+        const reasonMsg =
+          verdict.reason === "needModifier"
+            ? msg("shortcutNeedModifier", "Include Ctrl, Cmd, or Alt. Free combos:")
+            : msg(
+                "shortcutReserved",
+                "The browser reserves that combo — it can't be overridden. Free combos:"
+              );
+        setStatus(`${reasonMsg} ${suggestionText()}`, "error");
+        return;
+      }
+
+      const clash = SHORTCUT_ACTIONS.find(
+        (other) => other !== action && MF.shortcutsEqual(shortcuts[other], descriptor)
+      );
+      if (clash) {
+        setStatus(
+          msg(
+            "shortcutDuplicate",
+            "Already used by another MetaForce shortcut — pick a different combo."
+          ),
+          "error"
+        );
+        return;
+      }
+
+      shortcuts[action] = descriptor;
+      stopRecording();
+      setStatus(
+        verdict.warn
+          ? msg(
+              "shortcutDiscouraged",
+              "Set — note this combo shadows a common browser action on Salesforce pages. Click Save to apply."
+            )
+          : msg("shortcutSet", "Shortcut set — click Save to apply."),
+        verdict.warn ? "warn" : ""
+      );
+    });
+  });
+
+  document.querySelectorAll(".shortcut-reset").forEach((resetBtn) => {
+    resetBtn.addEventListener("click", () => {
+      const action = resetBtn.getAttribute("data-reset");
+      shortcuts[action] = MF.DEFAULT_SHORTCUTS[action];
+      stopRecording();
+      setStatus(msg("shortcutSet", "Shortcut set — click Save to apply."), "");
+    });
+  });
+
+  render();
+}
+
 async function init() {
   localize();
   const settings = await loadSettings();
@@ -45,13 +192,18 @@ async function init() {
   const apiEl = document.getElementById("apiVersion");
   const allDataEl = document.getElementById("enableAllData");
   const inlineEl = document.getElementById("enableInlineEdit");
+  const positionEl = document.getElementById("triggerPosition");
 
   themeEl.value = settings.theme;
   densityEl.value = settings.density;
   apiEl.value = settings.apiVersion;
   allDataEl.checked = settings.enableAllData;
   inlineEl.checked = settings.enableInlineEdit;
+  positionEl.value = settings.triggerPosition || DEFAULTS.triggerPosition;
   applyTheme(settings.theme);
+
+  const shortcuts = MF.getShortcuts(settings);
+  setupShortcutRecorder(shortcuts);
 
   // Inline edit only makes sense when the tab is enabled.
   const syncInlineEnabled = () => {
@@ -75,6 +227,12 @@ async function init() {
       apiVersion,
       enableAllData: allDataEl.checked,
       enableInlineEdit: allDataEl.checked && inlineEl.checked,
+      triggerPosition: positionEl.value,
+      shortcuts: {
+        togglePanel: shortcuts.togglePanel,
+        nextTab: shortcuts.nextTab,
+        prevTab: shortcuts.prevTab,
+      },
     };
     chrome.storage.sync.set({ [SETTINGS_KEY]: next }, showStatus);
   });

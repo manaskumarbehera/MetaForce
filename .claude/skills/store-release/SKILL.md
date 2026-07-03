@@ -61,7 +61,7 @@ them via API" — there is no endpoint.
 
 MetaForce only works **inside a logged-in Salesforce org on a record page**, so
 every review needs a Salesforce test account + steps, or **1.3.1 Product is
-Testable** fails. The panel opens via **Ctrl/Cmd+Shift+M** or a floating in-page
+Testable** fails. The panel opens via **Ctrl+Shift+M** (configurable in Options) or a floating in-page
 trigger button.
 
 - Paste-ready template: `DOCUMENTATION/certification-notes.template.md`.
@@ -85,7 +85,7 @@ The scenario the notes must walk the reviewer through (org-independent):
    notes file).
 2. Open any record (App Launcher → Accounts → open one;
    URL `.../lightning/r/Account/<id>/view`).
-3. Toggle the MetaForce panel: **Ctrl/Cmd+Shift+M** or the floating trigger
+3. Toggle the MetaForce panel: **Ctrl+Shift+M** (configurable in Options) or the floating trigger
    button.
 4. Confirm the panel lists field metadata (type, label, value, updateable,
    referenceTo); the **All Data** tab + search box exercise core functionality.

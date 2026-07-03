@@ -12,13 +12,37 @@
   const SETTINGS_KEY = "metaforceSettings";
   const FAVORITES_KEY = "metaforceFavorites";
 
+  // Keyboard shortcuts are stored as plain descriptors so the options page can
+  // record them and the content script can match them. Ctrl-based defaults work
+  // on every platform (Cmd combos are macOS menu equivalents Chrome grabs
+  // before the page ever sees the keydown).
+  const DEFAULT_SHORTCUTS = {
+    togglePanel: { ctrl: true, alt: false, shift: true, meta: false, code: "KeyM", key: "M" },
+    nextTab: { ctrl: true, alt: false, shift: true, meta: false, code: "Period", key: "." },
+    prevTab: { ctrl: true, alt: false, shift: true, meta: false, code: "Comma", key: "," },
+  };
+
   const DEFAULT_SETTINGS = {
     theme: "system", // "system" | "light" | "dark"
     apiVersion: "v67.0",
     enableAllData: true,
     enableInlineEdit: false,
     density: "comfortable", // "comfortable" | "compact"
+    triggerPosition: "middle-right", // "top-right" | "middle-right" | "bottom-right"
+    shortcuts: DEFAULT_SHORTCUTS,
   };
+
+  // Merge stored shortcuts over the defaults. The top-level settings merge is
+  // shallow, so a settings object saved by an older version has no `shortcuts`
+  // key at all — and a partial one must never leave an action unbound.
+  function getShortcuts(settings) {
+    const stored = (settings && settings.shortcuts) || {};
+    return {
+      togglePanel: stored.togglePanel || DEFAULT_SHORTCUTS.togglePanel,
+      nextTab: stored.nextTab || DEFAULT_SHORTCUTS.nextTab,
+      prevTab: stored.prevTab || DEFAULT_SHORTCUTS.prevTab,
+    };
+  }
 
   function getSettings() {
     return new Promise((resolve) => {
@@ -159,6 +183,159 @@
     return soql;
   }
 
+  // ── Keyboard shortcut helpers (pure; unit-tested) ─────────────────────────
+  // A descriptor is { ctrl, alt, shift, meta, code, key } where `code` is the
+  // physical KeyboardEvent.code (layout-independent — Alt+M on macOS types "µ"
+  // but the code stays "KeyM") and `key` is the human label shown in the UI.
+
+  // Human label for a KeyboardEvent.code, falling back to the event.key.
+  const CODE_LABELS = {
+    Comma: ",",
+    Period: ".",
+    Slash: "/",
+    Backslash: "\\",
+    Semicolon: ";",
+    Quote: "'",
+    Backquote: "`",
+    Minus: "-",
+    Equal: "=",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Space: "Space",
+    ArrowLeft: "Left",
+    ArrowRight: "Right",
+    ArrowUp: "Up",
+    ArrowDown: "Down",
+  };
+
+  function shortcutKeyLabel(code, key) {
+    if (!code) return String(key || "").toUpperCase();
+    if (CODE_LABELS[code]) return CODE_LABELS[code];
+    let m = code.match(/^Key([A-Z])$/);
+    if (m) return m[1];
+    m = code.match(/^Digit(\d)$/);
+    if (m) return m[1];
+    m = code.match(/^Numpad(\w+)$/);
+    if (m) return `Num ${m[1]}`;
+    if (/^F\d{1,2}$/.test(code)) return code;
+    return key && key.length === 1 ? key.toUpperCase() : code;
+  }
+
+  // Build a descriptor from a keydown event; null while only modifiers are down.
+  function shortcutFromEvent(event) {
+    const key = event.key;
+    if (key === "Control" || key === "Shift" || key === "Alt" || key === "Meta") return null;
+    return {
+      ctrl: !!event.ctrlKey,
+      alt: !!event.altKey,
+      shift: !!event.shiftKey,
+      meta: !!event.metaKey,
+      code: event.code,
+      key: shortcutKeyLabel(event.code, event.key),
+    };
+  }
+
+  function shortcutMatches(descriptor, event) {
+    return !!(
+      descriptor &&
+      descriptor.code &&
+      event.code === descriptor.code &&
+      !!event.ctrlKey === !!descriptor.ctrl &&
+      !!event.altKey === !!descriptor.alt &&
+      !!event.shiftKey === !!descriptor.shift &&
+      !!event.metaKey === !!descriptor.meta
+    );
+  }
+
+  function formatShortcut(descriptor, isMac) {
+    if (!descriptor || !descriptor.code) return "";
+    const parts = [];
+    if (descriptor.ctrl) parts.push("Ctrl");
+    if (descriptor.alt) parts.push(isMac ? "Option" : "Alt");
+    if (descriptor.shift) parts.push("Shift");
+    if (descriptor.meta) parts.push(isMac ? "Cmd" : "Win");
+    parts.push(descriptor.key || shortcutKeyLabel(descriptor.code));
+    return parts.join("+");
+  }
+
+  // Combos the browser or OS handles before the page sees the keydown — a
+  // content script cannot intercept or override these, so the recorder must
+  // reject them outright (Ctrl/Cmd+T/N/W, tab cycling, quit/hide/minimize…).
+  function shortcutIsReserved(descriptor, isMac) {
+    if (!descriptor || !descriptor.code) return false;
+    const d = descriptor;
+    const primary = d.ctrl || d.meta;
+    if (primary && (d.code === "KeyT" || d.code === "KeyN" || d.code === "KeyW")) return true;
+    if (d.ctrl && d.code === "Tab") return true;
+    if ((d.ctrl || d.meta) && d.shift && d.code === "KeyQ") return true;
+    if (d.alt && (d.code === "F4" || d.code === "Tab")) return true;
+    if (d.ctrl && d.code === "F4") return true;
+    if (isMac && d.meta) {
+      if (["KeyQ", "KeyH", "KeyM", "Backquote", "Comma", "Tab"].includes(d.code)) return true;
+    }
+    return false;
+  }
+
+  // Combos that do reach the page but shadow a very common browser action
+  // (find, print, save, reload…). Allowed, with a warning in the recorder.
+  function shortcutIsDiscouraged(descriptor) {
+    if (!descriptor || !descriptor.code) return false;
+    const d = descriptor;
+    const primary = (d.ctrl || d.meta) && !d.alt && !d.shift;
+    const common = [
+      "KeyF",
+      "KeyP",
+      "KeyS",
+      "KeyD",
+      "KeyG",
+      "KeyL",
+      "KeyR",
+      "KeyK",
+      "KeyE",
+      "KeyA",
+      "KeyC",
+      "KeyV",
+      "KeyX",
+      "KeyZ",
+      "KeyU",
+      "KeyO",
+      "KeyJ",
+      "KeyB",
+      "KeyI",
+    ];
+    return primary && common.includes(d.code);
+  }
+
+  // Recorder validation: { ok, reason?, warn? }.
+  function validateShortcut(descriptor, isMac) {
+    if (!descriptor || !descriptor.code) return { ok: false, reason: "empty" };
+    if (!descriptor.ctrl && !descriptor.meta && !descriptor.alt) {
+      return { ok: false, reason: "needModifier" };
+    }
+    if (shortcutIsReserved(descriptor, isMac)) return { ok: false, reason: "reserved" };
+    return { ok: true, warn: shortcutIsDiscouraged(descriptor) };
+  }
+
+  function shortcutsEqual(a, b) {
+    return !!(
+      a &&
+      b &&
+      a.code === b.code &&
+      !!a.ctrl === !!b.ctrl &&
+      !!a.alt === !!b.alt &&
+      !!a.shift === !!b.shift &&
+      !!a.meta === !!b.meta
+    );
+  }
+
+  // Safe, rarely-bound combos the options page offers as suggestions.
+  const SHORTCUT_SUGGESTIONS = [
+    { ctrl: true, alt: false, shift: true, meta: false, code: "KeyY", key: "Y" },
+    { ctrl: true, alt: false, shift: true, meta: false, code: "Space", key: "Space" },
+    { ctrl: true, alt: false, shift: true, meta: false, code: "KeyU", key: "U" },
+    { ctrl: false, alt: true, shift: true, meta: false, code: "KeyM", key: "M" },
+  ];
+
   // URL of the org's Developer Console. It lives on the instance
   // (my.salesforce.com) domain, so map a Lightning host across; other hosts
   // (already my.salesforce.com, Classic, VF) are used as-is.
@@ -171,6 +348,17 @@
     SETTINGS_KEY,
     FAVORITES_KEY,
     DEFAULT_SETTINGS,
+    DEFAULT_SHORTCUTS,
+    SHORTCUT_SUGGESTIONS,
+    getShortcuts,
+    shortcutKeyLabel,
+    shortcutFromEvent,
+    shortcutMatches,
+    formatShortcut,
+    shortcutIsReserved,
+    shortcutIsDiscouraged,
+    validateShortcut,
+    shortcutsEqual,
     getSettings,
     setSettings,
     getFavorites,

@@ -71,7 +71,7 @@ extension end-to-end you need a real Salesforce org:
    **Developer mode**, **Load unpacked** → select `dist/`.
 2. Sign in to a Salesforce org and open any record
    (`.../lightning/r/Account/<id>/view`).
-3. Toggle the panel: **Ctrl/Cmd+Shift+M**, or click the floating trigger button.
+3. Toggle the panel: **Ctrl+Shift+M** (configurable in Options), or click the floating trigger button.
 
 (Releasing to the stores is a separate concern — see the `store-release` skill.)
 

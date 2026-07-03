@@ -29,7 +29,7 @@ function loadSettings() {
 }
 loadSettings();
 
-// Toggle the panel from the keyboard shortcut routed via the service worker.
+// Toggle the panel open/closed (user-configurable keyboard shortcut).
 function mfTogglePanel() {
   const panel = mfRoot.querySelector("#mf-panel");
   const trigger = mfRoot.querySelector("#mf-trigger");
@@ -41,12 +41,44 @@ function mfTogglePanel() {
   }
 }
 try {
+  // Kept for backward compatibility with older service workers that still
+  // route the toggle as a message.
   chrome.runtime.onMessage.addListener((message) => {
     if (message && message.action === "togglePanel") mfTogglePanel();
   });
 } catch (_) {
   // messaging unavailable — keyboard toggle simply won't fire.
 }
+
+function mfPanelIsOpen() {
+  const panel = mfRoot.querySelector("#mf-panel");
+  return !!(panel && panel.style.display !== "none");
+}
+
+// User-configurable shortcuts (see options page): toggle the panel, switch
+// tabs. Capture phase so Salesforce's own handlers can't swallow the combo;
+// modifiers are mandatory, so plain typing never triggers anything.
+window.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.repeat) return;
+    const shortcuts = MF.getShortcuts(mfSettings);
+    if (MF.shortcutMatches(shortcuts.togglePanel, event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      mfTogglePanel();
+    } else if (
+      MF.shortcutMatches(shortcuts.nextTab, event) ||
+      MF.shortcutMatches(shortcuts.prevTab, event)
+    ) {
+      if (!mfPanelIsOpen() || !mfTabsApi) return;
+      event.preventDefault();
+      event.stopPropagation();
+      mfTabsApi.activate(mfTabsApi.current() === "search" ? "alldata" : "search", true);
+    }
+  },
+  true
+);
 
 // ── All Data tab state ───────────────────────────────────────────────────────
 // mfAd holds the DOM refs + filter state of the All Data panel; mfAdContext is
@@ -55,6 +87,10 @@ try {
 let mfAd = null;
 let mfAdContext = null;
 let mfAdNav = [];
+
+// Tab-strip handle for the keyboard tab-switch shortcut; set by buildTabStrip,
+// null while the panel has no tabs (All Data disabled or panel not built yet).
+let mfTabsApi = null;
 
 // ── Shadow DOM isolation ──────────────────────────────────────────────────────
 // All MetaForce UI lives inside a closed Shadow DOM attached to <html> (not
@@ -296,6 +332,7 @@ function removeSearchBox() {
   mfAd = null;
   mfAdContext = null;
   mfAdNav = [];
+  mfTabsApi = null;
 
   const searchContainer = mfRoot.querySelector("#mf-panel");
   if (searchContainer) {
@@ -341,15 +378,19 @@ function ensureSearchStyles() {
     animation: mf-spin 0.65s linear infinite;
   }
 
-  /* ── Main container & trigger icon ────────────────────────────── */
+  /* ── Main container & trigger icon ────────────────────────────────
+     Default anchor is the middle of the right edge — clear of Salesforce's
+     own bottom-right Help/chat buttons and the utility bar. The options
+     page can move it (applyTriggerPosition sets inline overrides). */
   #mf-main {
     position: fixed;
-    bottom: 24px;
-    right: 80px;
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%);
     z-index: 99999;
     display: flex;
     flex-direction: row;
-    align-items: flex-end;
+    align-items: center;
     gap: 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
@@ -892,6 +933,12 @@ function buildTabStrip(searchPane, rows, objectType, recordId) {
 
   searchTab.addEventListener("click", () => activate("search"));
   allDataTab.addEventListener("click", () => activate("alldata"));
+
+  // Expose the strip to the tab-switch keyboard shortcut.
+  mfTabsApi = {
+    activate,
+    current: () => (allDataPane.hidden ? "search" : "alldata"),
+  };
   strip.addEventListener("keydown", (event) => {
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
@@ -1560,6 +1607,42 @@ function applyHostTheme() {
   mfShadowHost.classList.toggle("mf-theme-light", theme === "light");
   mfShadowHost.classList.toggle("mf-theme-dark", theme === "dark");
   mfShadowHost.classList.toggle("mf-density-compact", mfSettings.density === "compact");
+  applyTriggerPosition();
+}
+
+// Anchor the trigger icon + panel where the user chose in the options page.
+// Inline styles override the stylesheet default (middle-right).
+function applyTriggerPosition() {
+  const main = mfRoot.querySelector("#mf-main");
+  if (!main) return;
+  const pos = mfSettings.triggerPosition || MF.DEFAULT_SETTINGS.triggerPosition;
+  if (pos === "bottom-right") {
+    // Legacy spot — kept selectable for users who prefer it.
+    Object.assign(main.style, {
+      top: "auto",
+      bottom: "24px",
+      right: "80px",
+      transform: "none",
+      alignItems: "flex-end",
+    });
+  } else if (pos === "top-right") {
+    // Below the Lightning global header + page-level action bar.
+    Object.assign(main.style, {
+      top: "110px",
+      bottom: "auto",
+      right: "14px",
+      transform: "none",
+      alignItems: "flex-start",
+    });
+  } else {
+    Object.assign(main.style, {
+      top: "50%",
+      bottom: "auto",
+      right: "14px",
+      transform: "translateY(-50%)",
+      alignItems: "center",
+    });
+  }
 }
 
 // The single source of theming + modern visual design. Defined as design tokens
@@ -1735,8 +1818,134 @@ function ensureThemeStyles() {
   }
   #${STATUS_ELEMENT_ID}.mf-status-error { border-color: var(--mf-danger); }
   #${STATUS_ELEMENT_ID}.mf-status-info { border-color: var(--mf-accent); }
+
+  /* ── "What's new" onboarding callout ─────────────────────────────
+     Colors come from the :host tokens above, so light + dark are both
+     covered by the token overrides. */
+  .mf-whatsnew {
+    margin: 10px 12px 2px; padding: 10px 12px;
+    background: var(--mf-accent-soft); border: 1px solid var(--mf-accent);
+    border-radius: var(--mf-radius-md); font-size: 12px; color: var(--mf-text);
+  }
+  .mf-whatsnew-title { font-weight: 700; margin-bottom: 6px; color: var(--mf-accent); }
+  .mf-whatsnew ul { margin: 0 0 8px; padding-left: 16px; }
+  .mf-whatsnew li { margin: 3px 0; line-height: 1.45; }
+  .mf-whatsnew kbd {
+    font: 600 11px var(--mf-mono); padding: 1px 5px; border-radius: 5px;
+    background: var(--mf-bg-solid); border: 1px solid var(--mf-border-2);
+    box-shadow: 0 1px 0 var(--mf-border-2);
+  }
+  .mf-whatsnew-actions { display: flex; gap: 6px; }
+  .mf-whatsnew-actions button {
+    font: 600 11px var(--mf-font); padding: 5px 12px; cursor: pointer;
+    border-radius: var(--mf-radius-sm); border: 1px solid transparent;
+  }
+  .mf-whatsnew-settings { background: var(--mf-grad); color: #fff; }
+  .mf-whatsnew-settings:hover { filter: brightness(1.06); }
+  .mf-whatsnew-dismiss { background: transparent; border-color: var(--mf-border-2); color: var(--mf-muted); }
+  .mf-whatsnew-dismiss:hover { border-color: var(--mf-accent); color: var(--mf-accent); }
   `;
   mfRoot.appendChild(style);
+}
+
+// ── "What's new" onboarding ──────────────────────────────────────────────────
+// Every release that changes how users interact with MetaForce must guide them
+// in-product: bump MF_WHATSNEW_VERSION and describe the change here. The
+// callout shows at the top of the panel until dismissed (flag in storage.sync).
+const MF_WHATSNEW_KEY = "metaforceWhatsNew";
+const MF_WHATSNEW_VERSION = "1.1.0";
+
+function mfKbd(descriptor, isMac) {
+  const kbd = document.createElement("kbd");
+  kbd.textContent = MF.formatShortcut(descriptor, isMac);
+  return kbd;
+}
+
+function mfMaybeShowWhatsNew(searchContainer, panelHeader) {
+  try {
+    chrome.storage.sync.get(MF_WHATSNEW_KEY, (stored) => {
+      const seen = stored && stored[MF_WHATSNEW_KEY] && stored[MF_WHATSNEW_KEY].seenVersion;
+      if (seen === MF_WHATSNEW_VERSION) return;
+      if (!searchContainer.isConnected || searchContainer.querySelector(".mf-whatsnew")) return;
+
+      const isMac = /mac/i.test(navigator.platform || "");
+      const shortcuts = MF.getShortcuts(mfSettings);
+
+      const box = document.createElement("div");
+      box.className = "mf-whatsnew";
+      box.setAttribute("role", "region");
+      box.setAttribute("aria-label", mfI18n("whatsNewTitle", "What's new in MetaForce"));
+
+      const title = document.createElement("div");
+      title.className = "mf-whatsnew-title";
+      title.textContent = "✨ " + mfI18n("whatsNewTitle", "What's new in MetaForce");
+
+      const list = document.createElement("ul");
+      const liToggle = document.createElement("li");
+      liToggle.append(
+        mfKbd(shortcuts.togglePanel, isMac),
+        " " + mfI18n("whatsNewToggle", "opens and closes this panel from the keyboard.")
+      );
+      const liTabs = document.createElement("li");
+      liTabs.append(
+        mfKbd(shortcuts.nextTab, isMac),
+        " / ",
+        mfKbd(shortcuts.prevTab, isMac),
+        " " + mfI18n("whatsNewTabs", "switch between the Search and All Data tabs.")
+      );
+      const liPos = document.createElement("li");
+      liPos.textContent = mfI18n(
+        "whatsNewPosition",
+        "The MetaForce button now sits at the middle of the right edge, away from Salesforce's own buttons."
+      );
+      const liCustomize = document.createElement("li");
+      liCustomize.textContent = mfI18n(
+        "whatsNewCustomize",
+        "Both the shortcuts and the button position are yours to change in Settings."
+      );
+      list.append(liToggle, liTabs, liPos, liCustomize);
+
+      const actions = document.createElement("div");
+      actions.className = "mf-whatsnew-actions";
+
+      const dismiss = () => {
+        try {
+          chrome.storage.sync.set({ [MF_WHATSNEW_KEY]: { seenVersion: MF_WHATSNEW_VERSION } });
+        } catch (_) {
+          // storage unavailable — the callout will simply show again next time.
+        }
+        box.remove();
+      };
+
+      const settingsBtn = document.createElement("button");
+      settingsBtn.type = "button";
+      settingsBtn.className = "mf-whatsnew-settings";
+      settingsBtn.textContent = mfI18n("whatsNewOpenSettings", "Open settings");
+      settingsBtn.addEventListener("click", () => {
+        try {
+          chrome.runtime.sendMessage(
+            { action: "openOptionsPage" },
+            () => void chrome.runtime.lastError
+          );
+        } catch (_) {
+          /* messaging unavailable */
+        }
+        dismiss();
+      });
+
+      const dismissBtn = document.createElement("button");
+      dismissBtn.type = "button";
+      dismissBtn.className = "mf-whatsnew-dismiss";
+      dismissBtn.textContent = mfI18n("whatsNewDismiss", "Got it");
+      dismissBtn.addEventListener("click", dismiss);
+
+      actions.append(settingsBtn, dismissBtn);
+      box.append(title, list, actions);
+      panelHeader.after(box);
+    });
+  } catch (_) {
+    // storage unavailable — skip onboarding rather than break the panel.
+  }
 }
 
 function createSearchBox(originalData, objectType = "", recordId = "") {
@@ -1763,6 +1972,7 @@ function createSearchBox(originalData, objectType = "", recordId = "") {
 
     mainContainer.appendChild(searchIcon);
     mfRoot.appendChild(mainContainer);
+    applyTriggerPosition();
 
     // Persists the last search text so "Back" can restore the filtered list
     let lastSearchText = "";
@@ -1883,6 +2093,7 @@ function createSearchBox(originalData, objectType = "", recordId = "") {
         searchContainer.append(panelHeader, searchPane);
       }
       mainContainer.appendChild(searchContainer);
+      mfMaybeShowWhatsNew(searchContainer, panelHeader);
 
       // ── Shared filter: matches field name OR stringified value ─────
       function filterRows(rows, query) {

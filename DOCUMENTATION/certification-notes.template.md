@@ -41,7 +41,7 @@ STEPS TO REVIEW
 3. Open any record — e.g. an Account: App Launcher → Accounts → open one record.
    The URL looks like .../lightning/r/Account/<id>/view
 4. Open the MetaForce panel one of two ways:
-   - Press Ctrl+Shift+M (Windows) / Cmd+Shift+M (macOS), OR
+   - Press Ctrl+Shift+M (same on Windows and macOS — the physical Ctrl key), OR
    - Click the floating MetaForce trigger button on the page.
 5. The panel lists the record's field metadata (type, label, value,
    updateable, referenceTo). Use the "All Data" tab and the search box to
